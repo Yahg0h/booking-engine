@@ -6,6 +6,7 @@ aiomysql
 cryptography
 pydantic
 pydantic-settings
+pydantic[email]
 python-dotenv
 jinja2
 python-multipart

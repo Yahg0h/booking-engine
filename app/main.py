@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI
 
-from app.api.v1 import v1_router
+from app.api.v1.routes.auth import router as auth_router
 from app.config import settings
 from app.database import check_database_connection
 
@@ -38,4 +38,5 @@ async def health_check():
         "db_error": error_message
     }
 
-app.include_router(v1_router)
+# Include all v1 routes
+app.include_router(auth_router)
