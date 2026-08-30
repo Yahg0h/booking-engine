@@ -83,12 +83,21 @@ class UserCreate(UserBase):
     password: str = Field(..., min_length=6, max_length=255)
 
 
-class UserUpdate(BaseModel):
+class UserUpdateAdmin(BaseModel):
     name: str | None = Field(default=None, max_length=150)
     email: EmailStr | None = None
     password: str | None = Field(default=None, min_length=6, max_length=255)
     role: UserRole | None = None
     is_active: bool | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UserUpdateOwn(BaseModel):
+    name: str | None = Field(default=None, max_length=150)
+    email: EmailStr | None = None
+    password: str | None = Field(default=None, min_length=6, max_length=255)
+    current_password: str
 
     model_config = ConfigDict(from_attributes=True)
 

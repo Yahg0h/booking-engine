@@ -4,7 +4,7 @@ All services related to user management used across all Booking Engine routes.
 
 from sqlalchemy import text
 
-from app.api.v1.services.password_service import hash_password
+from app.api.v1.services.password_service import hash_password, verify_password
 from app.database import engine
 
 
@@ -97,7 +97,35 @@ async def list_user_by_status(is_active: bool) -> list[dict] | None:
 
         return users_with_status
 
-async def update_user(user_id: int, name: str, email: str, password: str, role: str, is_active: bool) -> bool:
+async def list_users_filtered(organization_id: int | None, role: int | None, is_active: bool | None, user_role: int) -> list[dict] | None:
+    async with engine.connect() as conn:
+        query = "SELECT * FROM users WHERE 1=1"
+        params = {}
+
+        if role is not None:
+            query += " AND role = :role"
+            params["role"] = role
+        if is_active is not None:
+            query += " AND is_active = :is_active"
+            params["is_active"] = is_active
+
+        if user_role == "ROOT":
+            pass
+        elif user_role == "OWNER":
+            query += " AND organization_id = :organization_id"
+            params["organization_id"] = organization_id
+        else:
+            raise ValueError("Staff members aren't allowed to view this section.")
+
+        result = await conn.execute(text(query), params)
+        users = result.mappings().all()
+
+        filtered_users = [dict(user_row) for user_row in users]
+
+    return filtered_users
+        
+
+async def update_user_admin(user_id: int, name: str, email: str, password: str, role: str, is_active: bool) -> dict | None:
     async with engine.connect() as conn:
         # Build dynamic query where only the fields chosen to be changed get updated
         updates = []
@@ -121,19 +149,62 @@ async def update_user(user_id: int, name: str, email: str, password: str, role: 
             updates.append("role = :role")
             params["role"] = role
 
-        if is_active:
+        if is_active is not None:
             updates.append("is_active = :is_active")
             params["is_active"] = is_active
 
         if not updates:
-            return True
+            return None
 
         query = f"UPDATE users SET {', '.join(updates)} WHERE id = :user_id"
 
         await conn.execute(text(query), params)
         await conn.commit()
 
-        return True
+        updated_user = await search_user_by_id(user_id)
+
+        return updated_user
+
+async def update_own_profile(user_id: int, name: str | None, email: str | None, password: str | None, current_password: str) -> dict | None:
+    # Search user info and verify password before opening transaction
+    user = await search_user_by_id(user_id)
+   
+    # Verify if the current_password is correct
+    is_match = verify_password(current_password, user["password_hash"])
+
+    if not is_match:
+        raise ValueError("Current password is incorrect. Please Try Again.")
+
+    # Build dynamic query where only the fields chosen to be changed get updated
+    updates = []
+    params = {"user_id": user_id}
+
+    if name:
+        updates.append("name = :name")
+        params["name"] = name
+
+    if email:
+        updates.append("email = :email")
+        params["email"] = email
+
+    if password:
+        password = hash_password(password)
+
+        updates.append("password_hash = :password_hash")
+        params["password_hash"] = password
+
+    if not updates:
+        return None
+
+    async with engine.connect() as conn:
+        query = f"UPDATE users SET {', '.join(updates)} WHERE id = :user_id"
+
+        await conn.execute(text(query), params)
+        await conn.commit()
+
+    updated_user = await search_user_by_id(user_id)
+
+    return updated_user
 
 async def change_user_is_active(user_id: int, is_active: bool) -> bool:
     async with engine.connect() as conn:
