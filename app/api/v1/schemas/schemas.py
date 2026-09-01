@@ -136,10 +136,12 @@ class ProfessionalBase(BaseModel):
 
 
 class ProfessionalCreate(ProfessionalBase):
+    organization_id: int
     user_id: int | None = None
 
 
 class ProfessionalUpdate(BaseModel):
+    organization_id: int | None = None
     name: str | None = Field(default=None, max_length=150)
     user_id: int | None = None
     buffer_time_minutes: int | None = Field(default=None, ge=0)
@@ -151,7 +153,7 @@ class ProfessionalUpdate(BaseModel):
 class ProfessionalResponse(ProfessionalBase):
     id: int
     organization_id: int
-    user_id: int | None = None
+    user_id: int
     created_at: datetime
     updated_at: datetime
 
@@ -171,10 +173,11 @@ class ProcedureBase(BaseModel):
 
 
 class ProcedureCreate(ProcedureBase):
-    pass
+    organization_id: int
 
 
 class ProcedureUpdate(BaseModel):
+    id: int
     name: str | None = Field(default=None, max_length=150)
     description: str | None = None
     duration_minutes: int | None = Field(default=None, gt=0)
@@ -204,10 +207,18 @@ class ProfessionalProcedureBase(BaseModel):
 
 
 class ProfessionalProcedureCreate(ProfessionalProcedureBase):
-    pass
+    organization_id: int
 
+
+class ProfessionalProcedureRead(BaseModel):
+    organization_id: int
+    professional_id: int | None = None
+    procedure_id: int | None = None
 
 class ProfessionalProcedureUpdate(BaseModel):
+    organization_id: int
+    professional_id: int
+    procedure_id: int
     is_active: bool | None = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -238,10 +249,11 @@ class WorkingHoursBase(BaseModel):
 
 
 class WorkingHoursCreate(WorkingHoursBase):
-    pass
+    professional_id: int
 
 
 class WorkingHoursUpdate(BaseModel):
+    id: int
     weekday: int | None = Field(default=None, ge=1, le=7)
     start_time: time | None = None
     end_time: time | None = None
