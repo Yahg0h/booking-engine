@@ -3,8 +3,10 @@ from datetime import datetime, timezone
 from fastapi import FastAPI
 
 from app.api.v1.routes.auth import router as auth_router
-from app.api.v1.routes.users import router as users_router
 from app.api.v1.routes.organizations import router as organizations_router
+from app.api.v1.routes.procedures import router as procedures_router
+from app.api.v1.routes.professionals import router as professionals_router
+from app.api.v1.routes.users import router as users_router
 from app.config import settings
 from app.database import check_database_connection
 
@@ -46,3 +48,7 @@ app.include_router(auth_router)
 app.include_router(users_router)
 
 app.include_router(organizations_router)
+
+app.include_router(professionals_router)
+
+app.include_router(procedures_router)

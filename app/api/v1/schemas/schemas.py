@@ -137,7 +137,7 @@ class ProfessionalBase(BaseModel):
 
 class ProfessionalCreate(ProfessionalBase):
     organization_id: int
-    user_id: int | None = None
+    user_id: int
 
 
 class ProfessionalUpdate(BaseModel):
@@ -177,7 +177,6 @@ class ProcedureCreate(ProcedureBase):
 
 
 class ProcedureUpdate(BaseModel):
-    id: int
     name: str | None = Field(default=None, max_length=150)
     description: str | None = None
     duration_minutes: int | None = Field(default=None, gt=0)
@@ -206,8 +205,10 @@ class ProfessionalProcedureBase(BaseModel):
     is_active: bool = True
 
 
-class ProfessionalProcedureCreate(ProfessionalProcedureBase):
+class ProfessionalProcedureCreate(BaseModel):
     organization_id: int
+    procedure_id: int
+    is_active: bool = True
 
 
 class ProfessionalProcedureRead(BaseModel):
@@ -249,11 +250,10 @@ class WorkingHoursBase(BaseModel):
 
 
 class WorkingHoursCreate(WorkingHoursBase):
-    professional_id: int
+    pass
 
 
 class WorkingHoursUpdate(BaseModel):
-    id: int
     weekday: int | None = Field(default=None, ge=1, le=7)
     start_time: time | None = None
     end_time: time | None = None
@@ -278,7 +278,7 @@ class WorkingHoursResponse(WorkingHoursBase):
 class BlackoutBase(BaseModel):
     start_at: datetime
     end_at: datetime
-    reason: str | None = Field(default=None, max_length=255)
+    reason: str = Field(default=None, max_length=255)
 
     @model_validator(mode="after")
     def validate_period(self) -> "BlackoutBase":
@@ -294,7 +294,7 @@ class BlackoutCreate(BlackoutBase):
 class BlackoutUpdate(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
-    reason: str | None = Field(default=None, max_length=255)
+    reason: str = Field(default=None, max_length=255)
 
     model_config = ConfigDict(from_attributes=True)
 

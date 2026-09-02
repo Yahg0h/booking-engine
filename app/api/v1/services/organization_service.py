@@ -11,15 +11,18 @@ from app.database import engine
 
 # DATABASE OPERATIONS
 async def create_organization(name: str, slug: str, min_work_time: time, max_work_time: time) -> int:
-    async with engine.connect() as conn:
+    async with engine.begin() as conn:
         create_query = """
         INSERT INTO organizations (name, slug, min_work_time, max_work_time)
         VALUES (:name, :slug, :min_work_time, :max_work_time)
         """
         await conn.execute(text(create_query), {"name": name, "slug": slug, "min_work_time": min_work_time, "max_work_time": max_work_time})
-        await conn.commit()
 
-        query = await conn.execute(text("SELECT id FROM organizations WHERE id = LAST_INSERT_ID()"))
+        select_query = """
+        SELECT id FROM organizations WHERE slug = :slug
+        ORDER BY id DESC LIMIT 1
+        """
+        query = await conn.execute(text(select_query), {"slug": slug})
         recent_org_id = query.scalar()
 
     return recent_org_id
@@ -63,7 +66,7 @@ async def list_all_organizations() -> list[dict] | None:
     return registered_organizations
 
 async def update_organization(organization_id: int, name: str, slug: str, min_work_time: time, max_work_time: time) -> dict | None:
-    async with engine.connect() as conn:
+    async with engine.begin() as conn:
         # Build dyanmic query where only the fields chosen are updated
         updates = []
         params = {"organization_id": organization_id}
@@ -90,7 +93,6 @@ async def update_organization(organization_id: int, name: str, slug: str, min_wo
         query = f"UPDATE organizations SET {', '.join(updates)} WHERE id = :organization_id"
 
         await conn.execute(text(query), params)
-        await conn.commit()
 
         retrieve_query = await conn.execute(text("SELECT * FROM organizations WHERE id = :organization_id"), {"organization_id": organization_id})
         updated_org = retrieve_query.mappings().one_or_none()

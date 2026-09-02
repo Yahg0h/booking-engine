@@ -25,12 +25,16 @@ async def create_user(
     INSERT INTO users (organization_id, name, email, password_hash, role, is_active)
     VALUES (:organization_id, :name, :email, :password_hash, :role, :is_active)
     """
-    async with engine.connect() as conn:
+    async with engine.begin() as conn:
         await conn.execute(text(create_query), {"organization_id": organization_id, "name": name, "email": email, "password_hash": hashed_pass,
                                                         "role": role, "is_active": is_active})
         await conn.commit()
 
-        query = await conn.execute(text("SELECT id FROM users WHERE id = LAST_INSERT_ID()"))
+        select_query = """
+        SELECT id FROM users WHERE email = :email
+        ORDER BY id DESC LIMIT 1
+        """
+        query = await conn.execute(text(select_query), {"email": email})
         recent_user_id = query.scalar() # row to int
 
         return recent_user_id
@@ -126,7 +130,7 @@ async def list_users_filtered(organization_id: int | None, role: int | None, is_
         
 
 async def update_user_admin(user_id: int, name: str, email: str, password: str, role: str, is_active: bool) -> dict | None:
-    async with engine.connect() as conn:
+    async with engine.begin() as conn:
         # Build dynamic query where only the fields chosen to be changed get updated
         updates = []
         params = {"user_id": user_id}
@@ -159,7 +163,6 @@ async def update_user_admin(user_id: int, name: str, email: str, password: str, 
         query = f"UPDATE users SET {', '.join(updates)} WHERE id = :user_id"
 
         await conn.execute(text(query), params)
-        await conn.commit()
 
         updated_user = await search_user_by_id(user_id)
 
@@ -179,15 +182,15 @@ async def update_own_profile(user_id: int, name: str | None, email: str | None, 
     updates = []
     params = {"user_id": user_id}
 
-    if name:
+    if name is not None:
         updates.append("name = :name")
         params["name"] = name
 
-    if email:
+    if email is not None:
         updates.append("email = :email")
         params["email"] = email
 
-    if password:
+    if password is not None:
         password = hash_password(password)
 
         updates.append("password_hash = :password_hash")
@@ -196,7 +199,7 @@ async def update_own_profile(user_id: int, name: str | None, email: str | None, 
     if not updates:
         return None
 
-    async with engine.connect() as conn:
+    async with engine.begin() as conn:
         query = f"UPDATE users SET {', '.join(updates)} WHERE id = :user_id"
 
         await conn.execute(text(query), params)

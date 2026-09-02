@@ -60,7 +60,7 @@ CREATE TABLE users (
 -- ============================================================
 -- 3. PROFESSIONALS
 -- ============================================================
--- user_id is optional. If the linked User is removed, the professional
+-- user_id is required. If the linked User is removed, the professional
 -- remains and user_id becomes NULL. Cross-organization consistency
 -- (professional.organization_id == user.organization_id) is enforced
 -- by the backend.
