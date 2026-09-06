@@ -318,9 +318,15 @@ class CustomerBase(BaseModel):
     phone: str | None = Field(default=None, max_length=30)
     is_active: bool = True
 
+    @model_validator(mode="after")
+    def ensure_communication(self) -> "CustomerBase":
+        if not self.email and not self.phone:
+            raise ValueError("The customer must have at least one registered contact method.")
+        return self
+
 
 class CustomerCreate(CustomerBase):
-    pass
+    organization_id: int
 
 
 class CustomerUpdate(BaseModel):
@@ -362,18 +368,14 @@ class AppointmentBase(BaseModel):
         return self
 
 
-class AppointmentCreate(BaseModel):
-    customer_id: int
-    professional_id: int
-    procedure_id: int
-    start_at: datetime
-    notes: str | None = None
+class AppointmentCreate(AppointmentBase):
+    organization_id: int
 
 
 class AppointmentUpdate(BaseModel):
-    customer_id: int | None = None
-    professional_id: int | None = None
-    procedure_id: int | None = None
+    customer_id: int
+    professional_id: int
+    procedure_id: int
     start_at: datetime | None = None
     end_at: datetime | None = None
     status: AppointmentStatus | None = None

@@ -2,7 +2,7 @@
 All services related to professional management used across Booking Engine routes.
 """
 
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 
 from sqlalchemy import text
 
@@ -146,6 +146,24 @@ async def list_working_hours_by_professional(professional_id: int) -> list[dict]
         results = query.mappings().all()
 
         registered_wks = [dict(wk_row) for wk_row in results]
+
+    return registered_wks
+
+async def list_active_working_hours_by_professional(professional_id: int, is_active: bool | None = True) -> list[dict] | None:
+    async with engine.connect() as conn:
+        query = await conn.execute(text("SELECT * FROM working_hours WHERE professional_id = :professional_id AND is_active = :is_active"),
+                                   {"professional_id": professional_id, "is_active": is_active})
+        results = query.mappings().all()
+
+        registered_wks = []
+        for wk_row in results:
+            row_dict = dict(wk_row)
+            # Converta timedelta → time
+            if isinstance(row_dict['start_time'], timedelta):
+                row_dict['start_time'] = (datetime.min + row_dict['start_time']).time()
+            if isinstance(row_dict['end_time'], timedelta):
+                row_dict['end_time'] = (datetime.min + row_dict['end_time']).time()
+            registered_wks.append(row_dict)
 
     return registered_wks
 

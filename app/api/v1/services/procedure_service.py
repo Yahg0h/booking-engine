@@ -105,6 +105,20 @@ async def create_professional_procedure(organization_id: int, professional_id: i
 
     return True
 
+async def search_professional_procedure_unique(organization_id: int, professional_id: int, procedure_id: int, is_active: bool | None) -> dict | None:
+    async with engine.connect() as conn:
+        search_query = """
+        SELECT * FROM professional_procedures
+        WHERE organization_id = :organization_id
+        AND professional_id = :professional_id
+        AND procedure_id = :procedure_id AND is_active = :is_active
+        """
+        query = await conn.execute(text(search_query), {"organization_id": organization_id, "professional_id": professional_id,
+                                                        "procedure_id": procedure_id, "is_active": is_active})
+        results = query.mappings().one_or_none()
+
+    return results
+
 async def list_procedures_by_professionals(organization_id: int, professional_id: int) -> list[dict] | None:
     async with engine.connect() as conn:
         search_query = """
