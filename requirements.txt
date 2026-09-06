@@ -1,0 +1,19 @@
+# Base stack
+fastapi
+uvicorn[standard]
+sqlalchemy
+aiomysql
+cryptography
+pydantic
+pydantic-settings
+pydantic[email]
+python-dotenv
+jinja2
+python-multipart
+itsdangerous
+PyJWT
+passlib
+argon2_cffi
+slowapi
+
+redis
