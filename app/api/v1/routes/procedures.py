@@ -8,12 +8,12 @@ from app.api.v1.services.auth_service import (
 from app.api.v1.services.organization_service import search_organization_by_id
 from app.api.v1.services.procedure_service import (
     change_procedure_is_active,
+    check_procedure_access,
     create_procedure,
     list_procedures_by_org,
     search_procedure_by_id,
     update_procedure,
 )
-from app.api.v1.services.user_service import search_user_by_id
 
 # Configure router
 router = APIRouter(prefix="/v1")
@@ -21,11 +21,8 @@ router = APIRouter(prefix="/v1")
 # CREATE a procedure
 @router.post("/procedures", status_code=201)
 async def create_procedure_route(procedure: ProcedureCreate, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is the OWNER of the selected organization
-    is_owner = await search_user_by_id(user_id)
-
-    # If it isn't, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == procedure.organization_id) or is_owner["organization_id"] != procedure.organization_id:
+    # Check if the current user is the OWNER of the selected organization or root; If it isn't, return 403
+    if not await check_procedure_access(user_id, procedure.organization_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Else, create procedure that is going to be offered by the company
@@ -72,8 +69,7 @@ async def get_procedure(id: int, user_id: int = Depends(get_current_user_optiona
 # UPDATE a procedures information
 @router.patch("/procedures/{id}", status_code=200)
 async def update_procedure_route(id: int, procedure: ProcedureUpdate, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is the OWNER of the selected organization
-    is_owner = await search_user_by_id(user_id)
+    # Check if the current user is the OWNER of the selected organization or root
     procedure_info = await search_procedure_by_id(id)
 
     # If procedure doesn't exist, return 404
@@ -81,7 +77,7 @@ async def update_procedure_route(id: int, procedure: ProcedureUpdate, user_id: i
         raise HTTPException(status_code=404, detail="Procedure not found or it isn't offered.")
 
     # Else, check the owner validation, If it isn't, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == procedure_info["organization_id"]) or is_owner["organization_id"] != procedure_info["organization_id"]:
+    if not await check_procedure_access(user_id, procedure_info["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # If all well, update the procedure
@@ -94,8 +90,7 @@ async def update_procedure_route(id: int, procedure: ProcedureUpdate, user_id: i
 # DELETE a procedures information
 @router.delete("/procedures/{id}", status_code=200)
 async def delete_procedure(id: int, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is the OWNER of the selected organization
-    is_owner = await search_user_by_id(user_id)
+    # Check if the current user is the OWNER of the selected organization or root
     procedure_info = await search_procedure_by_id(id)
 
     # If procedure doesn't exist, return 404
@@ -103,7 +98,7 @@ async def delete_procedure(id: int, user_id: int = Depends(verify_user_token)):
         raise HTTPException(status_code=404, detail="Procedure not found or it isn't offered.")
 
     # Else, check the owner validation, If it isn't, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == procedure_info["organization_id"]) or is_owner["organization_id"] != procedure_info["organization_id"]:
+    if not await check_procedure_access(user_id, procedure_info["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.") 
 
     # Change procedure is_active to false

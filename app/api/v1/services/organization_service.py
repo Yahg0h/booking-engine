@@ -6,6 +6,7 @@ from datetime import time
 
 from sqlalchemy import text
 
+from app.api.v1.services.permission_service import is_owner, is_root
 from app.database import engine
 
 
@@ -98,3 +99,13 @@ async def update_organization(organization_id: int, name: str, slug: str, min_wo
         updated_org = retrieve_query.mappings().one_or_none()
 
     return updated_org
+
+# Access verification function
+async def check_organization_access(user_id: int, organization_id: int) -> bool:
+    """
+    ORGANIZATIONS: OWNER + ROOT can access it
+    """
+    root = await is_root(user_id)
+    owner = await is_owner(user_id, organization_id)
+
+    return bool(root or owner)

@@ -5,6 +5,7 @@ All services related to user management used across all Booking Engine routes.
 from sqlalchemy import text
 
 from app.api.v1.services.password_service import hash_password, verify_password
+from app.api.v1.services.permission_service import is_owner, is_root
 from app.database import engine
 
 
@@ -224,3 +225,13 @@ async def check_user_role(user_id: int, role: str) -> bool:
         if not results:
             return False
         return results["role"] == role
+
+# Access verification function
+async def check_user_access(user_id: int, organization_id: int) -> bool:
+    """
+    USERS: OWNER + ROOT can access it
+    """
+    root = await is_root(user_id)
+    owner = await is_owner(user_id, organization_id)
+
+    return bool(root or owner)

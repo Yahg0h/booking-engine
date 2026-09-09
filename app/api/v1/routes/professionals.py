@@ -15,6 +15,7 @@ from app.api.v1.services.auth_service import (
     verify_user_token,
 )
 from app.api.v1.services.organization_service import search_organization_by_id
+from app.api.v1.services.permission_service import is_root
 from app.api.v1.services.procedure_service import (
     change_pp_is_active,
     create_professional_procedure,
@@ -23,6 +24,7 @@ from app.api.v1.services.procedure_service import (
 )
 from app.api.v1.services.professional_service import (
     change_is_active,
+    check_professional_access,
     create_blackouts,
     create_professionals,
     create_working_hours,
@@ -43,11 +45,8 @@ router = APIRouter(prefix="/v1")
 # CREATE professional
 @router.post("/professionals", status_code=201)
 async def create_professional_route(professional: ProfessionalCreate, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is a OWNER of the selected professional organization
-    is_owner = await search_user_by_id(user_id)
-
-    # If the conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional.organization_id) or is_owner["organization_id"] != professional.organization_id:
+    # Check if the current user is a OWNER of the selected professional organization or root; If the conditions fail, return 403
+    if not await check_professional_access(user_id, professional.organization_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Else, create the professional
@@ -67,11 +66,8 @@ async def create_professional_route(professional: ProfessionalCreate, user_id: i
 # READ all professionals in a organization
 @router.get("/professionals", status_code=200)
 async def get_professionals(organization_id: int, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is a OWNER of the selected  organization
-    is_owner = await search_user_by_id(user_id)
-
-    # If the conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == organization_id) or is_owner["organization_id"] != organization_id:
+    # Check if the current user is a OWNER of the selected organization or root; If the conditions fail, return 403
+    if not await check_professional_access(user_id, organization_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
 
     # Else, get all professionals registered under this organization
@@ -83,11 +79,8 @@ async def get_professionals(organization_id: int, user_id: int = Depends(verify_
 # READ all professionals registered across all registered organizations (root-only)
 @router.get("/professionals/all", status_code=200)
 async def get_all_professionals(user_id: int = Depends(verify_user_token)):
-    # Check if the current user is a root account
-    is_root = await search_user_by_id(user_id)
-
-    # If it isn't, return 403
-    if is_root["role"] != "ROOT":
+    # Check if the current user is a root account; If it isn't, return 403
+    if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
 
     # Else, get all registered professionals registered
@@ -119,16 +112,15 @@ async def get_professional(id: int, user_id: int = Depends(get_current_user_opti
 # UPDATE a professional's information
 @router.patch("/professionals/{id}", status_code=200)
 async def update_professional_route(id: int, professional: ProfessionalUpdate, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is a OWNER of the organization which the professional is linked to
-    is_owner = await search_user_by_id(user_id)
+    # Check if the current user is a OWNER of the organization which the professional is linked to or root
     professional_db = await search_professional_by_id(id)
 
     # Check if the professional exists
     if not professional_db:
         raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
 
-    # If the conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional_db["organization_id"]) or is_owner["organization_id"] != professional_db["organization_id"]:
+    # If the access conditions fail, return 403
+    if not await check_professional_access(user_id, professional_db["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Else, update the professional info
@@ -141,16 +133,15 @@ async def update_professional_route(id: int, professional: ProfessionalUpdate, u
 # DELETE a professional (deactivated)
 @router.delete("/professionals/{id}", status_code=200)
 async def delete_professional(id: int, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is the owner of the organization which the professional is linked to
-    is_owner = await search_user_by_id(user_id)
+    # Check if the current user is the owner of the organization which the professional is linked to or root
     professional = await search_professional_by_id(id)
 
     # Check if professional exists
     if not professional:
         raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
 
-    # If the conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional["organization_id"]) or is_owner["organization_id"] != professional["organization_id"]:
+    # If the access conditions fail, return 403
+    if not await check_professional_access(user_id, professional["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Else, change the professional is_active to false
@@ -166,8 +157,7 @@ async def delete_professional(id: int, user_id: int = Depends(verify_user_token)
 # CREATE a professionals working hours
 @router.post("/professionals/{id}/working-hours")
 async def create_working_hour(id: int, workinghours: WorkingHoursCreate, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is the owner of the organization the professional is linked to
-    is_owner = await search_user_by_id(user_id)
+    # Check if the current user is the owner of the organization the professional is linked to or root
     professional = await search_professional_by_id(id)
     organization = await search_organization_by_id(professional["organization_id"])
 
@@ -176,7 +166,7 @@ async def create_working_hour(id: int, workinghours: WorkingHoursCreate, user_id
         return HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
 
     # If the owner conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional["organization_id"]) or is_owner["organization_id"] != professional["organization_id"]:
+    if not await check_professional_access(user_id, professional["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Check to see if the WorkingHours input is within the organizations max and min work time
@@ -230,8 +220,7 @@ async def get_working_hours_by_professional(professional_id: int, user_id: int =
 # UPDATE a existing working hour
 @router.patch("/professionals/{professional_id}/working-hours/{id}", status_code=200)
 async def update_working_hour(professional_id: int, id: int, workinghours: WorkingHoursUpdate, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is the owner of the organization the professional is linked to
-    is_owner = await search_user_by_id(user_id)
+    # Check if the current user is the owner of the organization the professional is linked to or root
     professional = await search_professional_by_id(professional_id)
     organization = await search_organization_by_id(professional["organization_id"])
 
@@ -240,7 +229,7 @@ async def update_working_hour(professional_id: int, id: int, workinghours: Worki
         return HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
 
     # If the owner conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional["organization_id"]) or is_owner["organization_id"] != professional["organization_id"]:
+    if not await check_professional_access(user_id, professional["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Check to see if the WorkingHours input is within the organizations max and min work time
@@ -307,15 +296,14 @@ async def create_blackout(id: int, blackout: BlackoutCreate, user_id: int = Depe
 # READ all blackouts of a professional
 @router.get("/professionals/{id}/blackouts", status_code=200)
 async def get_blackouts_by_professional(id: int, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is the owner of the organization the professional is linked to
-    is_owner = await search_user_by_id(user_id)
+    # Check if the current user is the owner of the organization the professional is linked to or root
     professional = await search_professional_by_id(id)
 
     if not professional:
         raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
 
     # If the owner conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional["organization_id"]) or is_owner["organization_id"] != professional["organization_id"]:
+    if not await check_professional_access(user_id, professional["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Else, get all blackouts registered by the professional
@@ -327,7 +315,7 @@ async def get_blackouts_by_professional(id: int, user_id: int = Depends(verify_u
 # READ a blackout of id 'id'
 @router.get("/professionals/blackouts/{id}", status_code=200)
 async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
-    # Check if the current user is the owner of the organization the professional is linked to
+    # Check if the current user is the owner of the organization the professional is linked to or root
     blackout = await search_blackout_by_id(id)
 
     # Check if the blackout exists
@@ -335,11 +323,10 @@ async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
         raise HTTPException(status_code=404, detail="Blackout not found or doesn't exist.")
 
     # Get current user information and professional information for owner verification
-    is_owner = await search_user_by_id(user_id)
     professional = await search_professional_by_id(blackout["professional_id"])
 
     # If the owner conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional["organization_id"]) or is_owner["organization_id"] != professional["organization_id"]:
+    if not await check_professional_access(user_id, professional["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Else, return the blackout
@@ -350,7 +337,6 @@ async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
 @router.post("/professionals/{id}/procedures", status_code=201)
 async def create_pp_relation(id: int, pp: ProfessionalProcedureCreate, user_id: int = Depends(verify_user_token)):
     # Get current user information and professional information for owner verification
-    is_owner = await search_user_by_id(user_id)
     professional = await search_professional_by_id(id)
 
     # If professional doesn't exist, return 404
@@ -358,7 +344,7 @@ async def create_pp_relation(id: int, pp: ProfessionalProcedureCreate, user_id: 
         raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
 
     # If the owner conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional["organization_id"]) or is_owner["organization_id"] != professional["organization_id"]:
+    if not await check_professional_access(user_id, professional["organization_id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Else, create a professional-procedure relation
@@ -369,6 +355,7 @@ async def create_pp_relation(id: int, pp: ProfessionalProcedureCreate, user_id: 
             "message": f"Professional-Procedure link successfully created. Professional {id} have procedure {pp.procedure_id} linked to it."
         }
         return success_dict
+
 # READ all procedures offered by a professional (public route)
 @router.get("/professionals/{id}/procedures", status_code=200)
 async def get_procedures_by_professionals(id: int, user_id: int = Depends(get_current_user_optional)):
@@ -391,7 +378,7 @@ async def get_procedures_by_professionals(id: int, user_id: int = Depends(get_cu
 @router.delete("/professionals/{id}/procedures/{procedure_id}", status_code=200)
 async def delete_professional_procedure(id: int, procedure_id: int, organization_id: int,user_id: int = Depends(verify_user_token)):
     # Check if the current user is the owner of the professional's organization and owner of the procedure's organization
-    is_owner = await search_user_by_id(user_id)
+    owner = await search_user_by_id(user_id)
     professional = await search_professional_by_id(id)
     procedure = await search_procedure_by_id(procedure_id)
 
@@ -400,7 +387,7 @@ async def delete_professional_procedure(id: int, procedure_id: int, organization
         raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
 
     # If the owner conditions fail, return 403
-    if (is_owner["role"] != "OWNER" and is_owner["organization_id"] == professional["organization_id"]) or (is_owner["organization_id"] != professional["organization_id"]) or is_owner["organization_id"] != procedure["organization_id"]:
+    if not await check_professional_access(user_id, professional["organization_id"]) or owner["organization_id"] != procedure["organization_id"]:
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Else, deactivate the link
