@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from sqlalchemy import text
 
+from app.api.v1.services.permission_service import is_owner, is_root
 from app.database import engine
 
 
@@ -167,3 +168,13 @@ async def change_pp_is_active(organization_id: int, professional_id: int, proced
         await conn.execute(text(update_query), {"is_active": is_active, "organization_id": organization_id, "professional_id": professional_id, "procedure_id": procedure_id})
 
     return True
+
+# Access verification function
+async def check_procedure_access(user_id: int, organization_id: int) -> bool:
+    """
+    PROCEDURES: OWNER + ROOT can access it
+    """
+    root = await is_root(user_id)
+    owner = await is_owner(user_id, organization_id)
+
+    return bool(root or owner)

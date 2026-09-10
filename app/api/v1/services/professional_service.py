@@ -6,6 +6,7 @@ from datetime import datetime, time, timedelta
 
 from sqlalchemy import text
 
+from app.api.v1.services.permission_service import is_owner, is_root
 from app.database import engine
 
 
@@ -292,3 +293,13 @@ async def update_blackout(id: int, professional_id: int, start_at: datetime | No
         recent_blackout = retrieve_query.mappings().one_or_none()
 
     return recent_blackout
+
+# Access verification function
+async def check_professional_access(user_id: int, organization_id: int) -> bool:
+    """
+    PROFESSIONALS: OWNER + ROOT can access it
+    """
+    root = await is_root(user_id)
+    owner = await is_owner(user_id, organization_id)
+
+    return bool(root or owner)

@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.v1.schemas.schemas import AppointmentCreate, AppointmentUpdate
 from app.api.v1.services.appointment_service import (
     appointment_canceled,
-    check_appointment_access,
     create_appointment,
     list_appointments_by_organization,
     search_appointment_by_id,
@@ -13,13 +12,14 @@ from app.api.v1.services.appointment_service import (
 )
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.organization_service import search_organization_by_id
+from app.api.v1.services.permission_service import is_root
 from app.api.v1.services.procedure_service import search_procedure_by_id
 from app.api.v1.services.professional_service import (
     search_professional_by_id,
 )
 
 # Configure router
-router = APIRouter(prefix="/v1")
+router = APIRouter(prefix="/v1/root")
 
 @router.post("/appointments", status_code=201)
 async def create_appointment_route(appointment: AppointmentCreate, user_id: int = Depends(verify_user_token)):
@@ -35,12 +35,12 @@ async def create_appointment_route(appointment: AppointmentCreate, user_id: int 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # If it is, raise 422
-    if appointment.start_at and appointment.start_at < now:
+    if appointment.start_at < now:
         raise HTTPException(status_code=422, detail="The appointment date must be from today onwards.")
 
     # Check access
-    if not await check_appointment_access(user_id, appointment.organization_id):
-        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
     # Else, create a appointment
     try:
@@ -57,15 +57,15 @@ async def create_appointment_route(appointment: AppointmentCreate, user_id: int 
 
     if created_appointment_id:
         success_dict = {
-            "message": f"Appointment ID {created_appointment_id} successfully created."
+            "message": f"ROOT: Appointment ID {created_appointment_id} successfully created."
         }
         return success_dict
 
 @router.get("/appointments", status_code=200)
 async def list_appointments(organization_id: int, user_id: int = Depends(verify_user_token)):
     # Check access
-    if not await check_appointment_access(user_id, organization_id):
-        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
     # Else, list all registered appointments in the organization
     registered_appointments = await list_appointments_by_organization(organization_id)
@@ -80,13 +80,9 @@ async def get_appointment(id: int, user_id: int = Depends(verify_user_token)):
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found or doesn't exist.")
 
-    # Get the organization's info in which the appointment is registered into
-    professional = await search_professional_by_id(appointment["professional_id"])
-    organization = await search_organization_by_id(professional["organization_id"])
-
     # Check access
-    if not await check_appointment_access(user_id, organization["id"]):
-        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
     # Else, return the appointment information
     return appointment
@@ -115,8 +111,8 @@ async def update_appointment(id: int, appointment: AppointmentUpdate, user_id: i
         raise HTTPException(status_code=422, detail="The appointment date must be from today onwards.")
 
     # Check access
-    if not await check_appointment_access(user_id, organization["id"]):
-        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
     # Else, update the appointment and return it
     try:
@@ -147,14 +143,14 @@ async def cancel_appointment(id: int, user_id: int = Depends(verify_user_token))
         raise HTTPException(status_code=404, detail="Organization, procedure or professional not found. Please retry.")
 
     # Check access
-    if not await check_appointment_access(user_id, organization["id"]):
-        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
     # Cancel the appointment
     is_canceled = await appointment_canceled(id)
 
     if is_canceled:
         success_dict = {
-            "message": f"Appointment {id} successfully canceled."
+            "message": f"ROOT: Appointment {id} successfully canceled."
         }
         return success_dict

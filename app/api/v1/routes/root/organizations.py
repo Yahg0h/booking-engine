@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.v1.schemas.schemas import OrganizationCreate, OrganizationUpdate
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.organization_service import (
-    check_organization_access,
     create_organization,
     search_organization_by_id,
     update_organization,
@@ -11,9 +10,9 @@ from app.api.v1.services.organization_service import (
 from app.api.v1.services.permission_service import is_root
 
 # Configure router
-router = APIRouter(prefix="/v1")
+router = APIRouter(prefix="/v1/root")
 
-# CREATE a organization (root-account only)
+# CREATE a organization (root)
 @router.post("/organizations", status_code=201)
 async def create_org(org_data: OrganizationCreate, user_id: int | None = Depends(verify_user_token)):
     # Check if the current account is a ROOT account; if it isn't, return 403
@@ -26,12 +25,12 @@ async def create_org(org_data: OrganizationCreate, user_id: int | None = Depends
     # Return the success message
     if recent_org:
         success_dict = {
-            "message": f"Organization successfully created. OrgID = {recent_org}."
+            "message": f"ROOT: Organization successfully created. OrgID = {recent_org}."
         }
 
     return success_dict
 
-# READ a organizations info (root and org owner account only)
+# READ a organizations info (root)
 @router.get("/organizations/{id}", status_code=200)
 async def get_organization(id: int, user_id: int | None = Depends(verify_user_token)):
     # Check if the organization exists
@@ -40,16 +39,16 @@ async def get_organization(id: int, user_id: int | None = Depends(verify_user_to
     if not is_real:
         raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
 
-    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
-    if not await check_organization_access(user_id, is_real["id"]):
-        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+    # Check the current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
     # Else, get the organization info and return it
     org_dict = await search_organization_by_id(id)
 
     return org_dict
 
-# UPDATE a organization's information (root and org owner account only)
+# UPDATE a organization's information (root)
 @router.patch("/organizations/{id}", status_code=200)
 async def update_org(id: int, org_data: OrganizationUpdate, user_id: int | None = Depends(verify_user_token)):
     # Check if the organization exists
@@ -58,9 +57,9 @@ async def update_org(id: int, org_data: OrganizationUpdate, user_id: int | None 
     if not is_real:
         raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
 
-    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
-    if not await check_organization_access(user_id, is_real["id"]):
-        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+    # Check the current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
     # Else, update the organization information
     is_updated = await update_organization(id, org_data.name, org_data.slug, org_data.min_work_time, org_data.max_work_time)

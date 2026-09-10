@@ -5,6 +5,7 @@ All services related to user management used across all Booking Engine routes.
 from sqlalchemy import text
 
 from app.api.v1.services.password_service import hash_password, verify_password
+from app.api.v1.services.permission_service import is_owner, is_root
 from app.database import engine
 
 
@@ -28,7 +29,6 @@ async def create_user(
     async with engine.begin() as conn:
         await conn.execute(text(create_query), {"organization_id": organization_id, "name": name, "email": email, "password_hash": hashed_pass,
                                                         "role": role, "is_active": is_active})
-        await conn.commit()
 
         select_query = """
         SELECT id FROM users WHERE email = :email
@@ -203,16 +203,14 @@ async def update_own_profile(user_id: int, name: str | None, email: str | None, 
         query = f"UPDATE users SET {', '.join(updates)} WHERE id = :user_id"
 
         await conn.execute(text(query), params)
-        await conn.commit()
 
     updated_user = await search_user_by_id(user_id)
 
     return updated_user
 
 async def change_user_is_active(user_id: int, is_active: bool) -> bool:
-    async with engine.connect() as conn:
+    async with engine.begin() as conn:
         await conn.execute(text("UPDATE users SET is_active = :is_active WHERE id = :user_id"), {"is_active": is_active, "user_id": user_id})
-        await conn.commit()
 
     return True
 
@@ -224,3 +222,13 @@ async def check_user_role(user_id: int, role: str) -> bool:
         if not results:
             return False
         return results["role"] == role
+
+# Access verification function
+async def check_user_access(user_id: int, organization_id: int) -> bool:
+    """
+    USERS: OWNER + ROOT can access it
+    """
+    root = await is_root(user_id)
+    owner = await is_owner(user_id, organization_id)
+
+    return bool(root or owner)
