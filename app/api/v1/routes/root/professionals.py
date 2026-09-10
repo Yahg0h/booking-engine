@@ -1,0 +1,397 @@
+from datetime import datetime, timedelta, timezone
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from app.api.v1.schemas.schemas import (
+    BlackoutCreate,
+    ProfessionalCreate,
+    ProfessionalProcedureCreate,
+    ProfessionalUpdate,
+    WorkingHoursCreate,
+    WorkingHoursUpdate,
+)
+from app.api.v1.services.auth_service import (
+    verify_user_token,
+)
+from app.api.v1.services.organization_service import search_organization_by_id
+from app.api.v1.services.permission_service import is_root
+from app.api.v1.services.procedure_service import (
+    change_pp_is_active,
+    create_professional_procedure,
+    list_professional_procedures,
+)
+from app.api.v1.services.professional_service import (
+    change_is_active,
+    create_blackouts,
+    create_professionals,
+    create_working_hours,
+    list_all_professionals,
+    list_blackouts_by_professional,
+    list_professionals_by_org,
+    list_working_hours_by_professional,
+    search_blackout_by_id,
+    search_professional_by_id,
+    update_professional,
+    update_working_hours,
+)
+
+# Configure router
+router = APIRouter(prefix="/v1/root")
+
+# CREATE professional
+@router.post("/professionals", status_code=201)
+async def create_professional_route(professional: ProfessionalCreate, user_id: int = Depends(verify_user_token)):
+    # Check if the current user is a OWNER of the selected professional organization or root; If the conditions fail, return 403
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Else, create the professional
+    created = await create_professionals(professional.organization_id,
+                                            professional.user_id,
+                                            professional.name,
+                                            professional.buffer_time_minutes,
+                                            professional.is_active)
+
+    # Return success message
+    success_dict = {
+        "message": f"ROOT: Professional successfully created. OrgID = {professional.organization_id}, PfID = {created}, UserID = {professional.user_id}."
+    }
+
+    return success_dict
+
+# READ all professionals in a organization
+@router.get("/professionals", status_code=200)
+async def get_professionals(organization_id: int, user_id: int = Depends(verify_user_token)):
+    # Check the current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Else, get all professionals registered under this organization
+    professionals = await list_professionals_by_org(organization_id)
+
+    # Return list
+    return professionals
+
+# READ all professionals registered across all registered organizations
+@router.get("/professionals/all", status_code=200)
+async def get_all_professionals(user_id: int = Depends(verify_user_token)):
+    # Check current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+
+    # Else, get all registered professionals registered
+    professionals = await list_all_professionals()
+
+    # Return list
+    return professionals
+
+# READ information of a specific professional (root)
+@router.get("/professionals/{id}", status_code=200)
+async def get_professional(id: int, user_id: int = Depends(verify_user_token)):
+    # Check if the professional exists
+    professional = await search_professional_by_id(id)
+
+    # If it doesn't, return 404
+    if not professional:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Return professional info
+    return professional
+
+# UPDATE a professional's information
+@router.patch("/professionals/{id}", status_code=200)
+async def update_professional_route(id: int, professional: ProfessionalUpdate, user_id: int = Depends(verify_user_token)):
+    # Get the professional's info
+    professional_db = await search_professional_by_id(id)
+
+    # Check if the professional exists
+    if not professional_db:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Else, update the professional info
+    updated_pro = await update_professional(id, professional.organization_id, professional.name, professional.user_id,
+                                            professional.buffer_time_minutes, professional.is_active)
+
+    # Return the updated professional info
+    return updated_pro
+
+# DELETE a professional (deactivated)
+@router.delete("/professionals/{id}", status_code=200)
+async def delete_professional(id: int, user_id: int = Depends(verify_user_token)):
+    # Get the professional's info
+    professional = await search_professional_by_id(id)
+
+    # Check if professional exists
+    if not professional:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check the current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Else, change the professional is_active to false
+    is_deleted = await change_is_active(id, False)
+
+    if is_deleted:
+        success_dict = {
+            "message": "ROOT: Professional has been successfully deactivated."
+        }
+        return success_dict
+
+# WORKING HOURS Related routes
+# CREATE a professionals working hours
+@router.post("/professionals/{id}/working-hours")
+async def create_working_hour(id: int, workinghours: WorkingHoursCreate, user_id: int = Depends(verify_user_token)):
+    # Get the professional's info and their organization_id
+    professional = await search_professional_by_id(id)
+    organization = await search_organization_by_id(professional["organization_id"])
+
+    # Check if the professional exists, if not, return 404
+    if not professional:
+        return HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Check to see if the WorkingHours input is within the organizations max and min work time
+    # Convert timedelta to time if needed (UTC 0 for now)
+    min_time = organization["min_work_time"]
+    max_time = organization["max_work_time"]
+
+    if isinstance(min_time, timedelta):
+        min_time = (datetime.min.replace(tzinfo=timezone.utc) + min_time).time()
+
+    if isinstance(max_time, timedelta):
+        max_time = (datetime.min.replace(tzinfo=timezone.utc) + max_time).time()
+
+    # Check to see if the WorkingHours input is within the organizations max and min work time
+    # start_time verification
+    if workinghours.start_time < min_time or workinghours.start_time > max_time:
+        raise HTTPException(status_code=422, detail="Professional's start time can't be earlier than the time the organization opens or after the organization closes.")
+
+    # end_time verification
+    if workinghours.end_time > max_time or workinghours.end_time < min_time:
+        raise HTTPException(status_code=422, detail="Professional's end time can't be earlier than the time the organization opens or after the organizationc closes.")
+
+    # Else, create the working hours for the professional
+    created_wk = await create_working_hours(id, workinghours.weekday, workinghours.start_time,
+                                            workinghours.end_time, workinghours.is_active)
+
+    # Return success message
+    if created_wk:
+        success_dict = {
+            "message": f"ROOT: Working hour successfully created. WkID = {created_wk}, ProfessionalID = {id}."
+        }
+
+        return success_dict
+
+# READ all working hours of a professional (root)
+@router.get("/professionals/{professional_id}/working-hours", status_code=200)
+async def get_working_hours_by_professional(professional_id: int, user_id: int = Depends(verify_user_token)):
+    # Get the professional's info
+    is_exist = await search_professional_by_id(professional_id)
+
+    # If it doesn't exist, return 404
+    if not is_exist:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Else, get all working hours registered under a professional
+    registered_wks = await list_working_hours_by_professional(professional_id)
+
+    # Return wks list
+    return registered_wks
+
+# UPDATE a existing working hour
+@router.patch("/professionals/{professional_id}/working-hours/{id}", status_code=200)
+async def update_working_hour(professional_id: int, id: int, workinghours: WorkingHoursUpdate, user_id: int = Depends(verify_user_token)):
+    # Get the professional's info and their organization_id
+    professional = await search_professional_by_id(professional_id)
+    organization = await search_organization_by_id(professional["organization_id"])
+
+    # Check if the professional exists, if not, return 404
+    if not professional:
+        return HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Check to see if the WorkingHours input is within the organizations max and min work time
+    # Convert timedelta to time if needed (UTC 0 for now)
+    min_time = organization["min_work_time"]
+    max_time = organization["max_work_time"]
+
+    if isinstance(min_time, timedelta):
+        min_time = (datetime.min.replace(tzinfo=timezone.utc) + min_time).time()
+
+    if isinstance(max_time, timedelta):
+        max_time = (datetime.min.replace(tzinfo=timezone.utc) + max_time).time()
+
+    # Check to see if the WorkingHours input is within the organizations max and min work time
+    # start_time verification
+    if workinghours.start_time < min_time or workinghours.start_time > max_time:
+        raise HTTPException(status_code=422, detail="Professional's start time can't be earlier than the time the organization opens or after the organization closes.")
+
+    # end_time verification
+    if workinghours.end_time > max_time or workinghours.end_time < min_time:
+        raise HTTPException(status_code=422, detail="Professional's end time can't be earlier than the time the organization opens or after the organizationc closes.")
+
+    # Update the working hour information
+    updated_wk = await update_working_hours(id, workinghours.weekday, workinghours.start_time, workinghours.end_time, workinghours.is_active)
+
+    # Return the updated working hour info
+    return updated_wk
+
+# BLACKOUTS related routes
+# CREATE a blackout (root)
+@router.post("/professionals/{id}/blackouts", status_code=201)
+async def create_blackout(id: int, blackout: BlackoutCreate, user_id: int = Depends(verify_user_token)):
+    # Verify if the professional exists
+    professional = await search_professional_by_id(id)
+
+    if not professional:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Check if the start and end time for the blackout are greater than today
+    today = datetime.now(timezone.utc)
+
+    # Convert dates to UTC 0 to check without any naive to non-naive errors
+    start_at = blackout.start_at.replace(tzinfo=timezone.utc)
+    end_at = blackout.end_at.replace(tzinfo=timezone.utc)
+
+    if start_at < today or end_at < today:
+        raise HTTPException(status_code=422, detail="The start or end date for the blackout must be from today onwards.")
+
+    # Else, create blackout
+    recent_blackout_id = await create_blackouts(id, blackout.start_at, blackout.end_at, blackout.reason)
+
+    # Return success message
+    if recent_blackout_id:
+        success_dict = {
+            "message": f"ROOT: Blackout successfully created for professional of id {id}. BlackoutID = {recent_blackout_id}"
+        }
+
+        return success_dict
+
+# READ all blackouts of a professional
+@router.get("/professionals/{id}/blackouts", status_code=200)
+async def get_blackouts_by_professional(id: int, user_id: int = Depends(verify_user_token)):
+    # Get the professional's info
+    professional = await search_professional_by_id(id)
+
+    # If it doesn't exist, return 404
+    if not professional:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check the current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Else, get all blackouts registered by the professional
+    registered_blackouts = await list_blackouts_by_professional(id)
+
+    # Return
+    return registered_blackouts
+
+# READ a blackout of id 'id'
+@router.get("/professionals/blackouts/{id}", status_code=200)
+async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
+    # Get the blackout info
+    blackout = await search_blackout_by_id(id)
+
+    # Check if the blackout exists
+    if not blackout:
+        raise HTTPException(status_code=404, detail="Blackout not found or doesn't exist.")
+
+    # Check the current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Else, return the blackout
+    return blackout
+
+# PROFESSIONAL-PROCEDURE RELATIONS ROUTES
+# CREATE professional-procedure relations
+@router.post("/professionals/{id}/procedures", status_code=201)
+async def create_pp_relation(id: int, pp: ProfessionalProcedureCreate, user_id: int = Depends(verify_user_token)):
+    # Get the professional's info
+    professional = await search_professional_by_id(id)
+
+    # If professional doesn't exist, return 404
+    if not professional:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check the current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+
+    # Else, create a professional-procedure relation
+    is_created = await create_professional_procedure(pp.organization_id, id, pp.procedure_id, pp.is_active)
+
+    if is_created:
+        success_dict = {
+            "message": f"ROOT: Professional-Procedure link successfully created. Professional {id} have procedure {pp.procedure_id} linked to it."
+        }
+        return success_dict
+
+# READ all procedures offered by a professional (root)
+@router.get("/professionals/{id}/procedures", status_code=200)
+async def get_procedures_by_professionals(id: int, user_id: int = Depends(verify_user_token)):
+    # Check if professional exists
+    professional_exists = await search_professional_by_id(id)
+    
+    # If it doesn't, return 404
+    if not professional_exists:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check the current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Get organization of the professional
+    organization_id = professional_exists["organization_id"]
+
+    # Get all procedures made by this
+    registered_pps = await list_professional_procedures(organization_id, id, None)
+
+    return registered_pps
+
+# DELETE a professional-procedure link (deactivate)
+@router.delete("/professionals/{id}/procedures/{procedure_id}", status_code=200)
+async def delete_professional_procedure(id: int, procedure_id: int, organization_id: int,user_id: int = Depends(verify_user_token)):
+    # Get the professional's info
+    professional = await search_professional_by_id(id)
+
+    # If professional doesn't exist, return 404
+    if not professional:
+        raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
+
+    # Check current user's access
+    if not await is_root(user_id):
+        raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Else, deactivate the link
+    is_deleted = await change_pp_is_active(organization_id, id, procedure_id, False)
+
+    if is_deleted:
+        success_dict = {
+            "message": f"ROOT: Successfully deactivated link between professional {id} and procedure {procedure_id}."
+        }
+        return success_dict

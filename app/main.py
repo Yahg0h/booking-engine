@@ -9,6 +9,12 @@ from app.api.v1.routes.customers import router as customers_router
 from app.api.v1.routes.organizations import router as organizations_router
 from app.api.v1.routes.procedures import router as procedures_router
 from app.api.v1.routes.professionals import router as professionals_router
+from app.api.v1.routes.root.appointments import router as root_appointments
+from app.api.v1.routes.root.customers import router as root_customers
+from app.api.v1.routes.root.organizations import router as root_organizations
+from app.api.v1.routes.root.procedures import router as root_procedures
+from app.api.v1.routes.root.professionals import router as root_professionals
+from app.api.v1.routes.root.users import router as root_users
 from app.api.v1.routes.users import router as users_router
 from app.config import settings
 from app.database import check_database_connection
@@ -45,7 +51,8 @@ async def health_check():
         "db_error": error_message
     }
 
-# Include all v1 routes
+# ==== Include all v1 routes ====
+# Normal routes
 app.include_router(auth_router)
 
 app.include_router(users_router)
@@ -61,3 +68,11 @@ app.include_router(customers_router)
 app.include_router(availability_router)
 
 app.include_router(appointment_service)
+
+# Root routes
+app.include_router(root_users)
+app.include_router(root_organizations)
+app.include_router(root_professionals)
+app.include_router(root_procedures)
+app.include_router(root_customers)
+app.include_router(root_appointments)
