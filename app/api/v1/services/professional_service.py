@@ -211,6 +211,16 @@ async def update_working_hours(id: int, weekday: int | None, start_time: time | 
 
     return recent_wk
 
+async def check_existing_weekday(weekday: int, professional_id: int) -> bool:
+    async with engine.connect() as conn:
+        search_query = """
+        SELECT * FROM working_hours WHERE weekday = :weekday AND professional_id = :professional_id
+        """
+        query = await conn.execute(text(search_query), {"weekday": weekday, "professional_id": professional_id})
+        existing_weekday = query.mappings().one_or_none()
+
+        return bool(existing_weekday)
+
 # BUFFER TIME changes (owner-only)
 
 async def change_buffer_time(id: int, buffer_time_minutes: int) -> dict | None:
