@@ -22,6 +22,7 @@ from app.api.v1.services.procedure_service import (
 )
 from app.api.v1.services.professional_service import (
     change_is_active,
+    check_existing_weekday,
     create_blackouts,
     create_professionals,
     create_working_hours,
@@ -162,6 +163,10 @@ async def create_working_hour(id: int, workinghours: WorkingHoursCreate, user_id
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
+    # Verify if the new working hour information isn't on a weekday that already has a working hour registered
+    if await check_existing_weekday(workinghours.weekday, id):
+        raise HTTPException(status_code=409, detail="A working hour record already exists for the selected day of the week.")
+
     # Check to see if the WorkingHours input is within the organizations max and min work time
     # Convert timedelta to time if needed (UTC 0 for now)
     min_time = organization["min_work_time"]
@@ -228,6 +233,10 @@ async def update_working_hour(professional_id: int, id: int, workinghours: Worki
     # Check current user's access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
+
+    # Verify if the new working hour information isn't on a weekday that already has a working hour registered
+    if await check_existing_weekday(workinghours.weekday, id):
+        raise HTTPException(status_code=409, detail="A working hour record already exists for the selected day of the week.")
 
     # Check to see if the WorkingHours input is within the organizations max and min work time
     # Convert timedelta to time if needed (UTC 0 for now)

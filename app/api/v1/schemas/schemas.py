@@ -315,7 +315,7 @@ class BlackoutResponse(BlackoutBase):
 class CustomerBase(BaseModel):
     name: str = Field(..., max_length=150)
     email: EmailStr | None = None
-    phone: str | None = Field(default=None, max_length=30)
+    phone: str | None = Field(default=None, pattern=r"^\+?[1-9]\d{1,14}$")
     is_active: bool = True
 
     @model_validator(mode="after")
@@ -332,7 +332,7 @@ class CustomerCreate(CustomerBase):
 class CustomerUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=150)
     email: EmailStr | None = None
-    phone: str | None = Field(default=None, max_length=30)
+    phone: str | None = Field(default=None, pattern=r"^\+?[1-9]\d{1,14}$")
     is_active: bool | None = None
 
     model_config = ConfigDict(from_attributes=True)
