@@ -357,15 +357,9 @@ class AppointmentBase(BaseModel):
     professional_id: int
     procedure_id: int
     start_at: datetime
-    end_at: datetime
+    end_at: datetime | None = None
     status: AppointmentStatus = AppointmentStatus.SCHEDULED
     notes: str | None = None
-
-    @model_validator(mode="after")
-    def validate_period(self) -> "AppointmentBase":
-        if self.start_at >= self.end_at:
-            raise ValueError("start_at must be before end_at.")
-        return self
 
 
 class AppointmentCreate(AppointmentBase):

@@ -10,7 +10,7 @@ from app.database import engine
 
 # DATABASE OPERATIONS
 async def create_appointment(organization_id: int, customer_id: int, professional_id: int, procedure_id: int,
-                             start_at: datetime, end_at: datetime, status: str, notes: str | None = None) -> int | None:
+                             start_at: datetime, status: str, end_at: datetime | None = None, notes: str | None = None) -> int | None:
     from app.api.v1.services.availability_service import availability_service
     async with engine.begin() as conn:
         # Check if the hour the user wants is available for booking
