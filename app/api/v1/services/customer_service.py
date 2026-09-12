@@ -1,6 +1,8 @@
 """
 All services related to customer management used across Booking Engine routes.
 """
+from datetime import datetime
+
 from sqlalchemy import text
 
 from app.api.v1.services.professional_service import search_professional_by_user_id
@@ -98,6 +100,15 @@ async def change_customer_is_active(id: int, is_active: bool) -> bool | None:
         UPDATE customers SET is_active = :is_active WHERE id = :id
         """
         await conn.execute(text(update_query), {"is_active": is_active, "id": id})
+
+    return True
+
+async def update_customer_last_appointment(customer_id: int, last_appointment_at: datetime) -> bool:
+    async with engine.begin() as conn:
+        update_query = """
+        UPDATE customers SET last_appointment_at = :last_appointment_at WHERE id = :id
+        """
+        await conn.execute(text(update_query), {"last_appointment_at": last_appointment_at, "id": customer_id})
 
     return True
 

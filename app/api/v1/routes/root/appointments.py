@@ -11,6 +11,7 @@ from app.api.v1.services.appointment_service import (
     update_appointments,
 )
 from app.api.v1.services.auth_service import verify_user_token
+from app.api.v1.services.customer_service import update_customer_last_appointment
 from app.api.v1.services.organization_service import search_organization_by_id
 from app.api.v1.services.permission_service import is_root
 from app.api.v1.services.procedure_service import search_procedure_by_id
@@ -114,7 +115,7 @@ async def update_appointment(id: int, appointment: AppointmentUpdate, user_id: i
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
-    # Else, update the appointment and return it
+    # Else, update the appointment
     try:
         updated_appointment = await update_appointments(id, organization["id"], appointment.customer_id,
                                                         appointment.professional_id, appointment.procedure_id,
@@ -123,7 +124,12 @@ async def update_appointment(id: int, appointment: AppointmentUpdate, user_id: i
                                                         )
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+    
+    # If the appointment has been completed, update the customers 'last_appointment_at' info
+    if appointment.status == "COMPLETED":
+        await update_customer_last_appointment(appointment.customer_id, now)
 
+    # Return the updated appointment info
     return updated_appointment
 
 @router.delete("/appointments/{id}", status_code=200)
