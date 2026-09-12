@@ -88,19 +88,18 @@ async def list_appointments_by_procedure(procedure_id: int) -> list[dict] | None
         
     return registered_appointments
 
-async def list_appointments_by_time_frame(organization_id: int, professional_id: int, procedure_id: int, start_at: datetime, end_at: datetime) -> list[dict] | None:
+async def list_appointments_by_time_frame(organization_id: int, professional_id: int, start_at: datetime, end_at: datetime) -> list[dict] | None:
     async with engine.connect() as conn:
         search_query = """
             SELECT id, start_at, end_at
             FROM appointments
             WHERE organization_id = :organization_id
               AND professional_id = :professional_id
-              AND procedure_id = :procedure_id
               AND start_at < :end_at
               AND end_at > :start_at
         """
         query = await conn.execute(text(search_query), {"organization_id": organization_id, "professional_id": professional_id,
-                                                        "procedure_id": procedure_id, "start_at": start_at, "end_at": end_at})
+                                                        "start_at": start_at, "end_at": end_at})
         results = query.mappings().all()
 
         registered_appointments = [dict(appoint_row) for appoint_row in results]

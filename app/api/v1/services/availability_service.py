@@ -62,6 +62,10 @@ async def availability_service(organization_id: int, professional_id: int, proce
     organization_start = datetime.combine(date, org_min_work)
     organization_end = datetime.combine(date, org_max_work)
 
+    # Check for a invalid organization time range
+    if organization_start >= organization_end:
+        raise ValueError("Invalid organization work time range.")
+
     # Adjust the start and end dates to fit the organization work time
     if dt_start < organization_start:
         dt_start = max(dt_start, organization_start)
