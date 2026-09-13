@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
+from app.api.v1.services.cache_service import acquire_lock, release_lock
 from app.api.v1.services.procedure_service import search_procedure_by_id
 from app.api.v1.services.professional_service import search_professional_by_user_id
 from app.api.v1.services.user_service import search_user_by_id
@@ -13,37 +14,45 @@ async def create_appointment(organization_id: int, customer_id: int, professiona
                              start_at: datetime, status: str, end_at: datetime | None = None, notes: str | None = None) -> int | None:
     from app.api.v1.services.availability_service import availability_service
     async with engine.begin() as conn:
-        # Check if the hour the user wants is available for booking
-        available_slots = await availability_service(organization_id, professional_id, procedure_id, start_at.date())
-        if start_at not in available_slots:
-            # If not, raise ValueError
-            raise ValueError("Selected time is not available.")
+        # Acquire distributed lock to prevent race condition (two requests for a one slot)
+        lock_key = f"lock:professional:{professional_id}:{int(start_at.timestamp())}"
+        if not acquire_lock(lock_key, timeout=60):
+            raise ValueError("Slot no longer available. Please try again.")
 
-        # Get the procedure's official duration time
-        # and update the estimated end time for the appointment.
-        procedure = await search_procedure_by_id(procedure_id)
-        end_at = start_at + timedelta(minutes=procedure["duration_minutes"])
+        try:
+            # Check if the hour the user wants is available for booking
+            available_slots = await availability_service(organization_id, professional_id, procedure_id, start_at.date())
+            if start_at not in available_slots:
+                # If not, raise ValueError
+                raise ValueError("Selected time is not available.")
 
-        # Insert
-        create_query = """
-        INSERT INTO appointments (organization_id, customer_id, professional_id, procedure_id, start_at, end_at, status, notes)
-        VALUES (:organization_id, :customer_id, :professional_id, :procedure_id, :start_at, :end_at, :status, :notes)
-        """
-        await conn.execute(text(create_query), {"organization_id": organization_id, "customer_id": customer_id,
-                                                "professional_id": professional_id, "procedure_id": procedure_id,
-                                                "start_at": start_at, "end_at": end_at, "status": status, "notes": notes})
-        # Get the recent appointment's id and return it
-        select_query = """
-        SELECT id FROM appointments
-        WHERE organization_id = :organization_id AND customer_id = :customer_id AND professional_id = :professional_id
-        AND procedure_id = :procedure_id AND start_at = :start_at
-        ORDER BY id DESC LIMIT 1
-        """
-        query = await conn.execute(text(select_query), {"organization_id": organization_id, "customer_id": customer_id, "professional_id": professional_id,
-                                                        "procedure_id": procedure_id, "start_at": start_at})
-        appointment_id = query.scalar()
+            # Get the procedure's official duration time
+            # and update the estimated end time for the appointment.
+            procedure = await search_procedure_by_id(procedure_id)
+            end_at = start_at + timedelta(minutes=procedure["duration_minutes"])
 
-    return appointment_id
+            # Insert
+            create_query = """
+            INSERT INTO appointments (organization_id, customer_id, professional_id, procedure_id, start_at, status, end_at, notes)
+            VALUES (:organization_id, :customer_id, :professional_id, :procedure_id, :start_at, :status, :end_at, :notes)
+            """
+            await conn.execute(text(create_query), {"organization_id": organization_id, "customer_id": customer_id,
+                                                    "professional_id": professional_id, "procedure_id": procedure_id,
+                                                    "start_at": start_at,"status": status, "end_at": end_at, "notes": notes})
+            # Get the recent appointment's id and return it
+            select_query = """
+            SELECT id FROM appointments
+            WHERE organization_id = :organization_id AND customer_id = :customer_id AND professional_id = :professional_id
+            AND procedure_id = :procedure_id AND start_at = :start_at
+            ORDER BY id DESC LIMIT 1
+            """
+            query = await conn.execute(text(select_query), {"organization_id": organization_id, "customer_id": customer_id, "professional_id": professional_id,
+                                                            "procedure_id": procedure_id, "start_at": start_at})
+            appointment_id = query.scalar()
+
+            return appointment_id
+        finally:
+            release_lock(lock_key)
 
 async def search_appointment_by_id(appointment_id: int) -> dict | None:
     async with engine.connect() as conn:

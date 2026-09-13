@@ -118,7 +118,6 @@ async def availability_service(organization_id: int, professional_id: int, proce
 
     registered_appointments = await list_appointments_by_time_frame(organization_id,
                                                                   professional_id,
-                                                                  procedure_id,
                                                                   start_at=day_start,
                                                                   end_at=day_end)
     for appointment in registered_appointments:
