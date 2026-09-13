@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import text
 
 from app.api.v1.schemas.schemas import UserCreate, UserLogin, UserResponse
+from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import (
     authenticate_user,
     create_jwt_token,
@@ -24,7 +25,7 @@ router = APIRouter(prefix="/v1")
 
 # Register Route
 @router.post("/register", status_code=201)
-async def register(user: UserCreate, user_id: int | None = Depends(get_current_user_optional)):
+async def register(request: Request, user: UserCreate, user_id: int | None = Depends(get_current_user_optional)):
     # Check if anyone is trying to create a 2nd ROOT account
     if user.role == 'ROOT':
         root_exists = await list_users_by_role("ROOT")
@@ -59,6 +60,33 @@ async def register(user: UserCreate, user_id: int | None = Depends(get_current_u
         user.is_active
         )
 
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    new_values = {
+        "organization_id": user.organization_id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active
+    }
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Log action
+    await log_action(
+        organization_id=user.organization_id,
+        actor_user_id=user_id,
+        action='CREATE',
+        entity_type='USER',
+        entity_id=new_user_id,
+        old_values=None,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
     # Return Success message
     success_dict = {
         "message": f"User created successfully. UserID = {new_user_id}."
@@ -67,7 +95,7 @@ async def register(user: UserCreate, user_id: int | None = Depends(get_current_u
 
 # Login Route
 @router.post("/login", status_code=200)
-async def login(user: UserLogin):
+async def login(request: Request, user: UserLogin):
     # Search if the user exists
     try:
         is_registered = await authenticate_user(user.email, user.password)
@@ -81,6 +109,28 @@ async def login(user: UserLogin):
 
     # If all well, create a JWT for user access
     token = create_jwt_token(is_registered)
+
+    # ==== AUDIT LOGS ENTRY ====
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+    # Get the user's organization_id
+    from app.api.v1.services.user_service import search_user_by_id
+    user_dict = await search_user_by_id(is_registered)
+    user_organization_id = int(user_dict["organization_id"]) if user_dict["organization_id"] else None
+
+    # Log action
+    await log_action(
+        organization_id=user_organization_id,
+        actor_user_id=is_registered,
+        action='LOGIN',
+        entity_type='USER',
+        entity_id=None,
+        old_values=None,
+        new_values=None,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
 
     # Return token to the user
     return {"access_token": token, "token_type": "bearer"}

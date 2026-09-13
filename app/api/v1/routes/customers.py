@@ -1,21 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import CustomerCreate, CustomerUpdate
+from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.customer_service import (
-        change_customer_is_active,
-        check_customer_access,
-        create_customer,
-        list_customers_by_organization,
-        search_customer_by_id,
-        update_customers,
+    change_customer_is_active,
+    check_customer_access,
+    create_customer,
+    list_customers_by_organization,
+    search_customer_by_id,
+    update_customers,
 )
 
 # Configure router
 router = APIRouter(prefix="/v1")
 
 @router.post("/customers", status_code=201)
-async def create_customers(customer: CustomerCreate, user_id: int = Depends(verify_user_token)):
+async def create_customers(request: Request, customer: CustomerCreate, user_id: int = Depends(verify_user_token)):
     # Check access (owner + staff)
     if not await check_customer_access(user_id, customer.organization_id, allow_staff=True):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -27,6 +28,33 @@ async def create_customers(customer: CustomerCreate, user_id: int = Depends(veri
                                             customer.phone,
                                             customer.is_active)
     if recent_customer:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {
+            "organization_id": customer.organization_id,
+            "name": customer.name,
+            "email": customer.email,
+            "phone": customer.phone,
+            "is_active": customer.is_active
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Log action
+        await log_action(
+            organization_id=customer.organization_id,
+            actor_user_id=user_id,
+            action='CREATE',
+            entity_type='CUSTOMER',
+            entity_id=recent_customer,
+            old_values=None,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
                 "message": f"Customer has been successfully created. CustomerID = {recent_customer}, OrgID = {customer.organization_id}."
         }
@@ -62,9 +90,9 @@ async def get_customer(id: int, user_id: int = Depends(verify_user_token)):
     return customer
 
 @router.patch("/customers/{id}", status_code=200)
-async def update_customer(id: int, customer_update: CustomerUpdate, user_id: int = Depends(verify_user_token)):
+async def update_customer(request: Request, id: int, customer_update: CustomerUpdate, user_id: int = Depends(verify_user_token)):
     # Check if the customer exists
-    customer = await search_customer_by_id(id)  # ✓ Nomes diferentes agora
+    customer = await search_customer_by_id(id)
     
     # If not found, return 404
     if not customer:
@@ -78,10 +106,39 @@ async def update_customer(id: int, customer_update: CustomerUpdate, user_id: int
     updated_customer = await update_customers(id, customer_update.name, customer_update.email, customer_update.phone, customer_update.is_active)
 
     if updated_customer:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        old_values = customer
+        new_values = {}
+        if customer_update.name is not None: new_values["name"] = customer_update.name
+        if customer_update.email is not None: new_values["email"] = customer_update.email
+        if customer_update.phone is not None: new_values["phone"] = customer_update.phone
+        if customer_update.is_active is not None: new_values["is_active"] = customer_update.is_active
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get organization id
+        customer_organization_id = int(customer["organization_id"]) if customer["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=customer_organization_id,
+            actor_user_id=user_id,
+            action='UPDATE',
+            entity_type='CUSTOMER',
+            entity_id=id,
+            old_values=old_values,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         return updated_customer
 
 @router.delete("/customers/{id}", status_code=200)
-async def delete_customer(id: int, user_id: int = Depends(verify_user_token)):
+async def delete_customer(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     # Check if the customer exists
     customer = await search_customer_by_id(id)
 
@@ -97,6 +154,33 @@ async def delete_customer(id: int, user_id: int = Depends(verify_user_token)):
     is_deleted = await change_customer_is_active(id, False)
 
     if is_deleted:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        old_values = customer
+        new_values = {
+            "is_active": False
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get organization id
+        customer_organization_id = int(customer["organization_id"]) if customer["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=customer_organization_id,
+            actor_user_id=user_id,
+            action='DELETE',
+            entity_type='CUSTOMER',
+            entity_id=id,
+            old_values=old_values,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"Customer {id} has been successfully deactivated."
         }
