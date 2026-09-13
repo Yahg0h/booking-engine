@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import ProcedureCreate, ProcedureUpdate
+from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import (
     verify_user_token,
 )
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/v1/root")
 
 # CREATE a procedure
 @router.post("/procedures", status_code=201)
-async def create_procedure_route(procedure: ProcedureCreate, user_id: int = Depends(verify_user_token)):
+async def create_procedure_route(request: Request, procedure: ProcedureCreate, user_id: int = Depends(verify_user_token)):
     # Check the current user's access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -30,6 +31,34 @@ async def create_procedure_route(procedure: ProcedureCreate, user_id: int = Depe
 
     # Return success message
     if recent_procedure_id:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {
+            "organization_id": procedure.organization_id,
+            "name": procedure.name,
+            "description": procedure.description,
+            "duration_minutes": procedure.duration_minutes,
+            "price": procedure.price,
+            "is_active": procedure.is_active
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Log action
+        await log_action(
+            organization_id=procedure.organization_id,
+            actor_user_id=user_id,
+            action='CREATE',
+            entity_type='PROCEDURE',
+            entity_id=recent_procedure_id,
+            old_values=None,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"ROOT: Procedure successfully created. ProcedureID = {recent_procedure_id}, OrgID = {procedure.organization_id}"
         }
@@ -75,7 +104,7 @@ async def get_procedure(id: int, user_id: int = Depends(verify_user_token)):
 
 # UPDATE a procedures information
 @router.patch("/procedures/{id}", status_code=200)
-async def update_procedure_route(id: int, procedure: ProcedureUpdate, user_id: int = Depends(verify_user_token)):
+async def update_procedure_route(request: Request, id: int, procedure: ProcedureUpdate, user_id: int = Depends(verify_user_token)):
     # Get the procedures information
     procedure_info = await search_procedure_by_id(id)
 
@@ -91,12 +120,42 @@ async def update_procedure_route(id: int, procedure: ProcedureUpdate, user_id: i
     updated_procedure = await update_procedure(id, procedure.name, procedure.description, procedure.duration_minutes, 
                                                procedure.price, procedure.is_active)
 
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    old_values = procedure_info
+    new_values = {}
+    if procedure.name is not None: new_values["name"] = procedure.name
+    if procedure.description is not None: new_values["description"] = procedure.description
+    if procedure.duration_minutes is not None: new_values["duration_minutes"] = procedure.duration_minutes
+    if procedure.price is not None: new_values["price"] = procedure.price
+    if procedure.is_active is not None: new_values["is_active"] = procedure.is_active
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Get organization id
+    procedure_organization_id = int(procedure_info["organization_id"]) if procedure_info["organization_id"] else None
+
+    # Log action
+    await log_action(
+        organization_id=procedure_organization_id,
+        actor_user_id=user_id,
+        action='UPDATE',
+        entity_type='PROCEDURE',
+        entity_id=id,
+        old_values=old_values,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
     # Return the updated procedure
     return updated_procedure
 
 # DELETE a procedures information
 @router.delete("/procedures/{id}", status_code=200)
-async def delete_procedure(id: int, user_id: int = Depends(verify_user_token)):
+async def delete_procedure(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     # Get the procedures information
     procedure_info = await search_procedure_by_id(id)
 
@@ -112,6 +171,33 @@ async def delete_procedure(id: int, user_id: int = Depends(verify_user_token)):
     is_deleted = await change_procedure_is_active(id, False)
 
     if is_deleted:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        old_values = procedure_info
+        new_values = {
+            "is_active": False
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get organization id
+        procedure_organization_id = int(procedure_info["organization_id"]) if procedure_info["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=procedure_organization_id,
+            actor_user_id=user_id,
+            action='DELETE',
+            entity_type='PROCEDURE',
+            entity_id=id,
+            old_values=old_values,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": "ROOT: Procedure has been successfully deactivated."
         }

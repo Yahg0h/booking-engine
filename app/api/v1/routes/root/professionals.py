@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import (
     BlackoutCreate,
@@ -10,6 +10,7 @@ from app.api.v1.schemas.schemas import (
     WorkingHoursCreate,
     WorkingHoursUpdate,
 )
+from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import (
     verify_user_token,
 )
@@ -41,7 +42,7 @@ router = APIRouter(prefix="/v1/root")
 
 # CREATE professional
 @router.post("/professionals", status_code=201)
-async def create_professional_route(professional: ProfessionalCreate, user_id: int = Depends(verify_user_token)):
+async def create_professional_route(request: Request, professional: ProfessionalCreate, user_id: int = Depends(verify_user_token)):
     # Check if the current user is a OWNER of the selected professional organization or root; If the conditions fail, return 403
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -52,6 +53,33 @@ async def create_professional_route(professional: ProfessionalCreate, user_id: i
                                             professional.name,
                                             professional.buffer_time_minutes,
                                             professional.is_active)
+
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    new_values = {
+        "organization_id": professional.organization_id,
+        "user_id": professional.user_id,
+        "name": professional.name,
+        "buffer_time_minutes": professional.buffer_time_minutes,
+        "is_active": professional.is_active
+    }
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Log action
+    await log_action(
+        organization_id=professional.organization_id,
+        actor_user_id=user_id,
+        action='CREATE',
+        entity_type='PROFESSIONAL',
+        entity_id=created,
+        old_values=None,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
 
     # Return success message
     success_dict = {
@@ -105,7 +133,7 @@ async def get_professional(id: int, user_id: int = Depends(verify_user_token)):
 
 # UPDATE a professional's information
 @router.patch("/professionals/{id}", status_code=200)
-async def update_professional_route(id: int, professional: ProfessionalUpdate, user_id: int = Depends(verify_user_token)):
+async def update_professional_route(request: Request, id: int, professional: ProfessionalUpdate, user_id: int = Depends(verify_user_token)):
     # Get the professional's info
     professional_db = await search_professional_by_id(id)
 
@@ -121,12 +149,42 @@ async def update_professional_route(id: int, professional: ProfessionalUpdate, u
     updated_pro = await update_professional(id, professional.organization_id, professional.name, professional.user_id,
                                             professional.buffer_time_minutes, professional.is_active)
 
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    old_values = professional_db
+    new_values = {}
+    if professional.organization_id is not None: new_values["organization_id"] = professional.organization_id
+    if professional.name is not None: new_values["name"] = professional.name
+    if professional.user_id is not None: new_values["user_id"] = professional.user_id
+    if professional.buffer_time_minutes is not None: new_values["buffer_time_minutes"] = professional.buffer_time_minutes
+    if professional.is_active is not None: new_values["is_active"] = professional.is_active
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Get user organization_id
+    user_organization_id = int(professional_db["organization_id"]) if professional_db["organization_id"] else None
+
+    # Log action
+    await log_action(
+        organization_id=user_organization_id,
+        actor_user_id=user_id,
+        action='UPDATE',
+        entity_type='PROFESSIONAL',
+        entity_id=id,
+        old_values=old_values,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
     # Return the updated professional info
     return updated_pro
 
 # DELETE a professional (deactivated)
 @router.delete("/professionals/{id}", status_code=200)
-async def delete_professional(id: int, user_id: int = Depends(verify_user_token)):
+async def delete_professional(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     # Get the professional's info
     professional = await search_professional_by_id(id)
 
@@ -142,6 +200,33 @@ async def delete_professional(id: int, user_id: int = Depends(verify_user_token)
     is_deleted = await change_is_active(id, False)
 
     if is_deleted:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        old_values = professional
+        new_values = {
+            "is_active": False
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get user organization_id
+        user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=user_organization_id,
+            actor_user_id=user_id,
+            action='DELETE',
+            entity_type='PROFESSIONAL',
+            entity_id=id,
+            old_values=old_values,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": "ROOT: Professional has been successfully deactivated."
         }
@@ -150,7 +235,7 @@ async def delete_professional(id: int, user_id: int = Depends(verify_user_token)
 # WORKING HOURS Related routes
 # CREATE a professionals working hours
 @router.post("/professionals/{id}/working-hours")
-async def create_working_hour(id: int, workinghours: WorkingHoursCreate, user_id: int = Depends(verify_user_token)):
+async def create_working_hour(request: Request, id: int, workinghours: WorkingHoursCreate, user_id: int = Depends(verify_user_token)):
     # Get the professional's info and their organization_id
     professional = await search_professional_by_id(id)
     organization = await search_organization_by_id(professional["organization_id"])
@@ -193,6 +278,35 @@ async def create_working_hour(id: int, workinghours: WorkingHoursCreate, user_id
 
     # Return success message
     if created_wk:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {
+            "weekday": workinghours.weekday,
+            "start_time": workinghours.start_time,
+            "end_time": workinghours.end_time,
+            "is_active": workinghours.is_active
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get user organization_id
+        user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=user_organization_id,
+            actor_user_id=user_id,
+            action='CREATE',
+            entity_type='WORKING_HOUR',
+            entity_id=created_wk,
+            old_values=None,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"ROOT: Working hour successfully created. WkID = {created_wk}, ProfessionalID = {id}."
         }
@@ -221,7 +335,7 @@ async def get_working_hours_by_professional(professional_id: int, user_id: int =
 
 # UPDATE a existing working hour
 @router.patch("/professionals/{professional_id}/working-hours/{id}", status_code=200)
-async def update_working_hour(professional_id: int, id: int, workinghours: WorkingHoursUpdate, user_id: int = Depends(verify_user_token)):
+async def update_working_hour(request: Request, professional_id: int, id: int, workinghours: WorkingHoursUpdate, user_id: int = Depends(verify_user_token)):
     # Get the professional's info and their organization_id
     professional = await search_professional_by_id(professional_id)
     organization = await search_organization_by_id(professional["organization_id"])
@@ -261,13 +375,43 @@ async def update_working_hour(professional_id: int, id: int, workinghours: Worki
     # Update the working hour information
     updated_wk = await update_working_hours(id, workinghours.weekday, workinghours.start_time, workinghours.end_time, workinghours.is_active)
 
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    from app.api.v1.services.professional_service import search_working_hour_by_id
+    old_values = await search_working_hour_by_id(id)
+    new_values = {}
+    if workinghours.weekday is not None: new_values["weekday"] = workinghours.weekday
+    if workinghours.start_time is not None: new_values["start_time"] = workinghours.start_time
+    if workinghours.end_time is not None: new_values["end_time"] = workinghours.end_time
+    if workinghours.is_active is not None: new_values["is_active"] = workinghours.is_active
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Get user organization_id
+    user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
+
+    # Log action
+    await log_action(
+        organization_id=user_organization_id,
+        actor_user_id=user_id,
+        action='UPDATE',
+        entity_type='WORKING_HOUR',
+        entity_id=id,
+        old_values=old_values,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
     # Return the updated working hour info
     return updated_wk
 
 # BLACKOUTS related routes
 # CREATE a blackout (root)
 @router.post("/professionals/{id}/blackouts", status_code=201)
-async def create_blackout(id: int, blackout: BlackoutCreate, user_id: int = Depends(verify_user_token)):
+async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, user_id: int = Depends(verify_user_token)):
     # Verify if the professional exists
     professional = await search_professional_by_id(id)
 
@@ -293,6 +437,34 @@ async def create_blackout(id: int, blackout: BlackoutCreate, user_id: int = Depe
 
     # Return success message
     if recent_blackout_id:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {
+            "start_at": blackout.start_at,
+            "end_at": blackout.end_at,
+            "reason": blackout.reason
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get user organization_id
+        user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=user_organization_id,
+            actor_user_id=user_id,
+            action='CREATE',
+            entity_type='BLACKOUT',
+            entity_id=recent_blackout_id,
+            old_values=None,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"ROOT: Blackout successfully created for professional of id {id}. BlackoutID = {recent_blackout_id}"
         }
@@ -339,7 +511,7 @@ async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
 # PROFESSIONAL-PROCEDURE RELATIONS ROUTES
 # CREATE professional-procedure relations
 @router.post("/professionals/{id}/procedures", status_code=201)
-async def create_pp_relation(id: int, pp: ProfessionalProcedureCreate, user_id: int = Depends(verify_user_token)):
+async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedureCreate, user_id: int = Depends(verify_user_token)):
     # Get the professional's info
     professional = await search_professional_by_id(id)
 
@@ -355,6 +527,34 @@ async def create_pp_relation(id: int, pp: ProfessionalProcedureCreate, user_id: 
     is_created = await create_professional_procedure(pp.organization_id, id, pp.procedure_id, pp.is_active)
 
     if is_created:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {
+            "organization_id": pp.organization_id,
+            "procedure_id": pp.procedure_id,
+            "is_active": pp.is_active
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get user organization_id
+        user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=user_organization_id,
+            actor_user_id=user_id,
+            action='CREATE',
+            entity_type='PROFESSIONAL_PROCEDURE',
+            entity_id=None,
+            old_values=None,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"ROOT: Professional-Procedure link successfully created. Professional {id} have procedure {pp.procedure_id} linked to it."
         }
@@ -384,7 +584,7 @@ async def get_procedures_by_professionals(id: int, user_id: int = Depends(verify
 
 # DELETE a professional-procedure link (deactivate)
 @router.delete("/professionals/{id}/procedures/{procedure_id}", status_code=200)
-async def delete_professional_procedure(id: int, procedure_id: int, organization_id: int,user_id: int = Depends(verify_user_token)):
+async def delete_professional_procedure(request: Request, id: int, procedure_id: int, organization_id: int,user_id: int = Depends(verify_user_token)):
     # Get the professional's info
     professional = await search_professional_by_id(id)
 
@@ -400,6 +600,36 @@ async def delete_professional_procedure(id: int, procedure_id: int, organization
     is_deleted = await change_pp_is_active(organization_id, id, procedure_id, False)
 
     if is_deleted:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        from app.api.v1.services.procedure_service import (
+            search_professional_procedure_unique,
+        )
+        old_values = await search_professional_procedure_unique(organization_id, id, procedure_id, None)
+        new_values = {
+            "is_active": False
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get user organization_id
+        user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=user_organization_id,
+            actor_user_id=user_id,
+            action='DELETE',
+            entity_type='PROFESSIONAL_PROCEDURE',
+            entity_id=None,
+            old_values=old_values,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"ROOT: Successfully deactivated link between professional {id} and procedure {procedure_id}."
         }
