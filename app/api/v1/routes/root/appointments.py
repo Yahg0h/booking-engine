@@ -50,8 +50,8 @@ async def create_appointment_route(appointment: AppointmentCreate, user_id: int 
                                                           appointment.professional_id,
                                                           appointment.procedure_id,
                                                           appointment.start_at,
-                                                          appointment.end_at,
                                                           appointment.status,
+                                                          appointment.end_at,
                                                           appointment.notes)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
