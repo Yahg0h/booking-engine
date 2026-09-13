@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import UserCreate, UserUpdateAdmin, UserUpdateOwn
+from app.api.v1.services.audit_service import (
+    get_ip_from_request,
+    log_action,
+    sanitize_audit_values,
+)
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.permission_service import is_root
 from app.api.v1.services.user_service import (
@@ -19,7 +24,7 @@ router = APIRouter(prefix="/v1")
 
 # CREATE a user staff account
 @router.post("/users", status_code=201)
-async def create_staff(user: UserCreate, user_id: int | None = Depends(verify_user_token)):
+async def create_staff(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
     # Check access (owner or root only)
     if not await check_user_access(user_id, user.organization_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -41,6 +46,33 @@ async def create_staff(user: UserCreate, user_id: int | None = Depends(verify_us
         user.is_active
     )
 
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    new_values = {
+        "organization_id": user.organization_id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active
+    }
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Log action
+    await log_action(
+        organization_id=user.organization_id,
+        actor_user_id=user_id,
+        action='CREATE',
+        entity_type='USER',
+        entity_id=new_staff_id,
+        old_values=None,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
     # Return success message
     success_dict = {
         "message": f"Staff user account created successfully. UserID = {new_staff_id}, OrgID = {user.organization_id}."
@@ -49,7 +81,7 @@ async def create_staff(user: UserCreate, user_id: int | None = Depends(verify_us
 
 # CREATE a user owner account (root-account only)
 @router.post("/users/owners", status_code=201)
-async def create_owner(user: UserCreate, user_id: int | None = Depends(verify_user_token)):
+async def create_owner(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
     # Check if the current user is a ROOT account
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -70,7 +102,34 @@ async def create_owner(user: UserCreate, user_id: int | None = Depends(verify_us
         user.role,
         user.is_active
     )
- 
+
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    new_values = {
+        "organization_id": user.organization_id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active
+    }
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Log action
+    await log_action(
+        organization_id=user.organization_id,
+        actor_user_id=user_id,
+        action='CREATE',
+        entity_type='USER',
+        entity_id=new_owner_id,
+        old_values=None,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+    
     # Return success message
     success_dict = {
         "message": f"Owner user account created successfully. UserID = {new_owner_id}, OrgID = {user.organization_id}."
@@ -110,7 +169,7 @@ async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
 
 # UPDATE a user's information (User-only)
 @router.patch("/users/{id}", status_code=200)
-async def update_user_info(id: int, user: UserUpdateOwn, user_id: int | None = Depends(verify_user_token)):
+async def update_user_info(request: Request, id: int, user: UserUpdateOwn, user_id: int | None = Depends(verify_user_token)):
     # Check if the current user's is the user of id 'id'; if it isn't, return 403
     if id != user_id:
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -125,12 +184,43 @@ async def update_user_info(id: int, user: UserUpdateOwn, user_id: int | None = D
     if not is_updated:
         raise HTTPException(status_code=400, detail="An error occured while updating the user's information")
 
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    old_values = await search_user_by_id(user_id)
+    new_values = {}
+    if user.name is not None: new_values["name"] = user.name
+    if user.email is not None: new_values["email"] = user.email
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Get user organization_id
+    user_organization_id = int(old_values["organization_id"]) if old_values["organization_id"] else None
+
+    # Filter sensive information out of old_values
+    old_values = sanitize_audit_values(old_values)
+    new_values = sanitize_audit_values(new_values)
+
+    # Log action
+    await log_action(
+        organization_id=user_organization_id,
+        actor_user_id=user_id,
+        action='UPDATE',
+        entity_type='USER',
+        entity_id=user_id,
+        old_values=old_values,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
     # Else, return the newly updated user info
     return is_updated
 
 # UPDATE a user's information (Admin - root and owner Only)
 @router.patch("/users/admin/update/{id}", status_code=200)
-async def elevated_user_update(id: int, user: UserUpdateAdmin, user_id: int | None = Depends(verify_user_token)):
+async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin, user_id: int | None = Depends(verify_user_token)):
     # Get the selected user's organization id
     user_info = await search_user_by_id(id)
 
@@ -149,11 +239,44 @@ async def elevated_user_update(id: int, user: UserUpdateAdmin, user_id: int | No
     if not is_updated:
         raise HTTPException(status_code=400, detail="An error occured while updating the user's information")
 
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    old_values = user_info
+    new_values = {}
+    if user.name is not None: new_values["name"] = user.name
+    if user.email is not None: new_values["email"] = user.email
+    if user.role is not None: new_values["role"] = user.role
+    if user.is_active is not None: new_values["is_active"] = user.is_active
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Get user organization_id
+    user_organization_id = int(user_info["organization_id"]) if user_info["organization_id"] else None
+
+    # Filter sensive information out of old_values
+    old_values = sanitize_audit_values(old_values)
+    new_values = sanitize_audit_values(new_values)
+
+    # Log action
+    await log_action(
+        organization_id=user_organization_id,
+        actor_user_id=user_id,
+        action='UPDATE',
+        entity_type='USER',
+        entity_id=id,
+        old_values=old_values,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
     # Else, return the newly updated user info
     return is_updated
 
 @router.delete("/users/{id}", status_code=200)
-async def delete_user(id: int, user_id: int | None = Depends(verify_user_token)):
+async def delete_user(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
     # Get the selected user's organization id
     user_info = await search_user_by_id(id)
 
@@ -170,6 +293,37 @@ async def delete_user(id: int, user_id: int | None = Depends(verify_user_token))
 
     # Return success message
     if is_deactivated:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        old_values = user_info
+        new_values = {
+            "is_active": False
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get user organization_id
+        user_organization_id = int(user_info["organization_id"]) if user_info["organization_id"] else None
+    
+        # Filter sensive information out of old_values
+        old_values = sanitize_audit_values(old_values)
+        new_values = sanitize_audit_values(new_values)
+    
+        # Log action
+        await log_action(
+            organization_id=user_organization_id,
+            actor_user_id=user_id,
+            action='DELETE',
+            entity_type='USER',
+            entity_id=id,
+            old_values=old_values,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"User of id {id} has been deactivated."
         }

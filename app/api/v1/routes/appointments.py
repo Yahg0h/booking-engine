@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import AppointmentCreate, AppointmentUpdate
 from app.api.v1.services.appointment_service import (
@@ -11,6 +11,7 @@ from app.api.v1.services.appointment_service import (
     search_appointment_by_id,
     update_appointments,
 )
+from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.customer_service import update_customer_last_appointment
 from app.api.v1.services.organization_service import search_organization_by_id
@@ -23,7 +24,7 @@ from app.api.v1.services.professional_service import (
 router = APIRouter(prefix="/v1")
 
 @router.post("/appointments", status_code=201)
-async def create_appointment_route(appointment: AppointmentCreate, user_id: int = Depends(verify_user_token)):
+async def create_appointment_route(request: Request, appointment: AppointmentCreate, user_id: int = Depends(verify_user_token)):
     # Check if the org, customer, professional, procedure exists
     organization = await search_organization_by_id(appointment.organization_id)
     procedure = await search_procedure_by_id(appointment.procedure_id)
@@ -57,6 +58,36 @@ async def create_appointment_route(appointment: AppointmentCreate, user_id: int 
         raise HTTPException(status_code=409, detail=str(e))
 
     if created_appointment_id:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {
+            "organization_id": appointment.organization_id,
+            "customer_id": appointment.customer_id,
+            "professional_id": appointment.professional_id,
+            "procedure_id": appointment.procedure_id,
+            "start_at": appointment.start_at,
+            "status": appointment.status,
+            "end_at": appointment.end_at,
+            "notes": appointment.notes
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Log action
+        await log_action(
+            organization_id=appointment.organization_id,
+            actor_user_id=user_id,
+            action='CREATE',
+            entity_type='APPOINTMENT',
+            entity_id=created_appointment_id,
+            old_values=None,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"Appointment ID {created_appointment_id} successfully created."
         }
@@ -93,7 +124,7 @@ async def get_appointment(id: int, user_id: int = Depends(verify_user_token)):
     return appointment
 
 @router.patch("/appointments/{id}", status_code=200)
-async def update_appointment(id: int, appointment: AppointmentUpdate, user_id: int = Depends(verify_user_token)):
+async def update_appointment(request: Request, id: int, appointment: AppointmentUpdate, user_id: int = Depends(verify_user_token)):
     # Check if the appointment exists
     is_exist = await search_appointment_by_id(id)
 
@@ -129,6 +160,38 @@ async def update_appointment(id: int, appointment: AppointmentUpdate, user_id: i
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
 
+    # ==== AUDIT LOGS ENTRY ====
+    # Get organization id
+    appointment_organization_id = int(is_exist["organization_id"]) if is_exist["organization_id"] else None
+
+    # Add new values to a dict and log action
+    old_values = is_exist
+    new_values = {"organization_id": appointment_organization_id}
+    if appointment.customer_id is not None: new_values["customer_id"] = appointment.customer_id
+    if appointment.professional_id is not None: new_values["professional_id"] = appointment.professional_id
+    if appointment.procedure_id is not None: new_values["procedure_id"] = appointment.procedure_id
+    if appointment.start_at is not None: new_values["start_at"] = appointment.start_at
+    if appointment.end_at is not None: new_values["end_at"] = appointment.end_at
+    if appointment.status is not None: new_values["status"] = appointment.status
+    if appointment.notes is not None: new_values["notes"] = appointment.notes
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Log action
+    await log_action(
+        organization_id=appointment_organization_id,
+        actor_user_id=user_id,
+        action='UPDATE',
+        entity_type='APPOINTMENT',
+        entity_id=id,
+        old_values=old_values,
+        new_values=new_values,
+        metadata={"source": "api", "version": "1.0"},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
     # If the appointment has been completed, update the customers 'last_appointment_at' info
     if appointment.status == "COMPLETED":
         await update_customer_last_appointment(appointment.customer_id, now)
@@ -137,7 +200,7 @@ async def update_appointment(id: int, appointment: AppointmentUpdate, user_id: i
     return updated_appointment
 
 @router.delete("/appointments/{id}", status_code=200)
-async def cancel_appointment(id: int, user_id: int = Depends(verify_user_token)):
+async def cancel_appointment(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     # Check if the appointment exists
     appointment = await search_appointment_by_id(id)
 
@@ -160,6 +223,33 @@ async def cancel_appointment(id: int, user_id: int = Depends(verify_user_token))
     is_canceled = await appointment_canceled(id)
 
     if is_canceled:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        old_values = appointment
+        new_values = {
+            "status": "CANCELLED"
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+
+        # Get organization id
+        appointment_organization_id = int(appointment["organization_id"]) if appointment["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=appointment_organization_id,
+            actor_user_id=user_id,
+            action='DELETE',
+            entity_type='APPOINTMENT',
+            entity_id=id,
+            old_values=old_values,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
         success_dict = {
             "message": f"Appointment {id} successfully canceled."
         }
