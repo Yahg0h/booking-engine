@@ -17,3 +17,4 @@ argon2_cffi
 slowapi
 
 redis
+python-json-logger

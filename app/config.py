@@ -2,6 +2,8 @@
 Enviroment configuration for TicketPlus + templates path definition.
 """
 
+from typing import Literal
+
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,5 +34,12 @@ class Settings(BaseSettings):
 
     # ==== EXTERNAL APIs ====
     REDIS_SECRET_KEY: str
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+
+    # ==== LOGGING ====
+    LOG_FORMAT: Literal["TEXT", "JSON"] = "TEXT"
+    LOG_LEVEL: str = "INFO"
 
 settings = Settings()

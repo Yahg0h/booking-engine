@@ -1,3 +1,9 @@
+import logging
+
+from app.logging_config import sanitize_for_logging
+
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import UserCreate, UserUpdateAdmin
@@ -71,6 +77,12 @@ async def create_account(request: Request, user: UserCreate, user_id: int | None
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
+
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"ROOT: User account created: id={new_account_id}, "
+        f"org_id={user.organization_id}"
+    )
 
     # Return success message
     success_dict = {
@@ -159,6 +171,14 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
     )
     # ==== END OF AUDIT LOGS ENTRY ====
 
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"ROOT: User account updated: id={id}, "
+        f"org_id={user_organization_id}, "
+        f"email={sanitize_for_logging(new_values.get('email'), 'email') if 'email' in new_values else 'N/A'},"
+        f"field_changed={list(new_values.keys())}"
+    )
+
     # Else, return the newly updated user info
     return is_updated
 
@@ -211,6 +231,12 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
         )
         # ==== END OF AUDIT LOGS ENTRY ====
         
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"ROOT: User account deleted: id={id}, "
+            f"org_id={user_organization_id}"
+        )
+
         success_dict = {
             "message": f"ROOT: User of id {id} has been deactivated."
         }

@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -85,6 +89,12 @@ async def create_professional_route(request: Request, professional: Professional
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
+    
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"Professional created: id={created}, "
+        f"org_id={professional.organization_id}"
+    )
 
     # Return success message
     success_dict = {
@@ -187,6 +197,13 @@ async def update_professional_route(request: Request, id: int, professional: Pro
     )
     # ==== END OF AUDIT LOGS ENTRY ====
 
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"Procedure updated: id={id}, "
+        f"org_id={user_organization_id}, "
+        f"field_changed={list(new_values.keys())}"
+    )
+
     # Return the updated professional info
     return updated_pro
 
@@ -234,6 +251,12 @@ async def delete_professional(request: Request, id: int, user_id: int = Depends(
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Procedure deleted: id={id}, "
+            f"org_id={user_organization_id}"
+        )
 
         success_dict = {
             "message": "Professional has been successfully deactivated."
@@ -314,6 +337,13 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Working Hour created: id={created_wk}, "
+            f"org_id={user_organization_id}, "
+            f"prof_id={id}, "
+        )
 
         success_dict = {
             "message": f"Working hour successfully created. WkID = {created_wk}, ProfessionalID = {id}."
@@ -408,6 +438,16 @@ async def update_working_hour(request: Request, professional_id: int, id: int, w
     )
     # ==== END OF AUDIT LOGS ENTRY ====
 
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"Working Hour updated: id={id}, "
+        f"org_id={user_organization_id}, "
+        f"prof_id={professional_id}, "
+        f"start_at={new_values.get('start_at').isoformat() if 'start_at' in new_values else 'N/A'}, "
+        f"end_at={new_values.get('end_at').isoformat() if 'end_at' in new_values else 'N/A'}, "
+        f"field_changed={list(new_values.keys())}"
+    )
+
     # Return the updated working hour info
     return updated_wk
 
@@ -467,6 +507,13 @@ async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, u
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Blackout created: id={recent_blackout_id}, "
+            f"org_id={user_organization_id}, "
+            f"prof_id={id}"
+        )
 
         success_dict = {
             "message": f"Blackout successfully created for professional of id {id}. BlackoutID = {recent_blackout_id}"
@@ -560,6 +607,14 @@ async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedur
         )
         # ==== END OF AUDIT LOGS ENTRY ====
 
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Professional-Procedure created, "
+            f"org_id={user_organization_id}, "
+            f"prof_id={id}"
+            f"procedure_id={pp.procedure_id}"
+        )
+
         success_dict = {
             "message": f"Professional-Procedure link successfully created. Professional {id} have procedure {pp.procedure_id} linked to it."
         }
@@ -632,6 +687,14 @@ async def delete_professional_procedure(request: Request, id: int, procedure_id:
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Professional-Procedure link deleted, "
+            f"org_id={user_organization_id}, "
+            f"prof_id={id}"
+            f"procedure_id={procedure_id}"
+        )
 
         success_dict = {
             "message": f"Successfully deactivated link between professional {id} and procedure {procedure_id}."
