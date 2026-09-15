@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -58,6 +62,15 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
         raise HTTPException(status_code=409, detail=str(e))
 
     if created_appointment_id:
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"ROOT: Appointment created: id={created_appointment_id}, "
+            f"professional_id={appointment.professional_id}, "
+            f"customer_id={appointment.customer_id}, "
+            f"organization_id={appointment.organization_id}, "
+            f"start_at={appointment.start_at.isoformat()}"
+        )
+
         # ==== AUDIT LOGS ENTRY ====
         # Add new values to a dict and log action
         new_values = {
@@ -188,6 +201,13 @@ async def update_appointment(request: Request, id: int, appointment: Appointment
     )
     # ==== END OF AUDIT LOGS ENTRY ====
     
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"ROOT: Appointment updated: id={id}, "
+        f"org_id={appointment_organization_id}, "
+        f"field_changed={list(new_values.keys())}"
+    )
+
     # If the appointment has been completed, update the customers 'last_appointment_at' info
     if appointment.status == "COMPLETED":
         await update_customer_last_appointment(appointment.customer_id, now)
@@ -245,6 +265,12 @@ async def cancel_appointment(request: Request, id: int, user_id: int = Depends(v
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"ROOT: Appointment deleted: id={id}, "
+            f"org_id={appointment_organization_id}"
+        )
 
         success_dict = {
             "message": f"ROOT: Appointment {id} successfully canceled."

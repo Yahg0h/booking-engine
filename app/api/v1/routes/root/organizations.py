@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import OrganizationCreate, OrganizationUpdate
@@ -50,6 +54,11 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"ROOT: Organization created: id={recent_org}"
+        )
 
         success_dict = {
             "message": f"ROOT: Organization successfully created. OrgID = {recent_org}."
@@ -116,5 +125,21 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        # Sanitize time fields
+        updated_values = {}
+        for key, value in new_values.items():
+            if key in ['min_work_time', 'max_work_time'] and value is not None:
+                updated_values[key] = value.isoformat()
+            else:
+                updated_values[key] = value
+        # Log
+        logger.info(
+            f"ROOT: Organization updated: id={id}, "
+            f"field_changed={list(updated_values.keys())}, "
+            f"min_work_time={updated_values.get('min_work_time', 'N/A')}, "
+            f"max_work_time={updated_values.get('max_work_time', 'N/A')}"
+        )
 
         return is_updated

@@ -1,3 +1,9 @@
+import logging
+
+from app.logging_config import sanitize_for_logging
+
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import UserCreate, UserUpdateAdmin, UserUpdateOwn
@@ -73,6 +79,12 @@ async def create_staff(request: Request, user: UserCreate, user_id: int | None =
     )
     # ==== END OF AUDIT LOGS ENTRY ====
 
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"User staff account created: id={new_staff_id}, "
+        f"org_id={user.organization_id}"
+    )
+
     # Return success message
     success_dict = {
         "message": f"Staff user account created successfully. UserID = {new_staff_id}, OrgID = {user.organization_id}."
@@ -130,6 +142,12 @@ async def create_owner(request: Request, user: UserCreate, user_id: int | None =
     )
     # ==== END OF AUDIT LOGS ENTRY ====
     
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"User owner account created: id={new_owner_id}, "
+        f"org_id={user.organization_id}"
+    )
+
     # Return success message
     success_dict = {
         "message": f"Owner user account created successfully. UserID = {new_owner_id}, OrgID = {user.organization_id}."
@@ -215,6 +233,14 @@ async def update_user_info(request: Request, id: int, user: UserUpdateOwn, user_
     )
     # ==== END OF AUDIT LOGS ENTRY ====
 
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"User-updated user account: id={id}, "
+        f"org_id={user_organization_id}, "
+        f"email={sanitize_for_logging(new_values.get('email'), 'email') if 'email' in new_values else 'N/A'},"
+        f"field_changed={list(new_values.keys())}"
+    )
+
     # Else, return the newly updated user info
     return is_updated
 
@@ -272,6 +298,14 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
     )
     # ==== END OF AUDIT LOGS ENTRY ====
 
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"Admin-updated user account: id={id}, "
+        f"org_id={user_organization_id}, "
+        f"email={sanitize_for_logging(new_values.get('email'), 'email') if 'email' in new_values else 'N/A'},"
+        f"field_changed={list(new_values.keys())}"
+    )
+
     # Else, return the newly updated user info
     return is_updated
 
@@ -323,6 +357,12 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"User account deleted: id={id}, "
+            f"org_id={user_organization_id}"
+        )
 
         success_dict = {
             "message": f"User of id {id} has been deactivated."

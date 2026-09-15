@@ -1,3 +1,10 @@
+import logging
+
+from app.logging_config import sanitize_for_logging
+
+logger = logging.getLogger(__name__)
+
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import text
@@ -86,6 +93,12 @@ async def register(request: Request, user: UserCreate, user_id: int | None = Dep
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
+
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"User created: id={new_user_id}, "
+        f"org_id={user.organization_id}"
+    )
 
     # Return Success message
     success_dict = {

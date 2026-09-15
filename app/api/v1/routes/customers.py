@@ -1,3 +1,9 @@
+import logging
+
+from app.logging_config import sanitize_for_logging
+
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import CustomerCreate, CustomerUpdate
@@ -54,6 +60,12 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Customer created: id={recent_customer}, "
+            f"org_id={customer.organization_id}"
+        )
 
         success_dict = {
                 "message": f"Customer has been successfully created. CustomerID = {recent_customer}, OrgID = {customer.organization_id}."
@@ -135,6 +147,15 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
         )
         # ==== END OF AUDIT LOGS ENTRY ====
 
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Customer updated: id={id}, "
+            f"org_id={customer_organization_id}, "
+            f"email={sanitize_for_logging(new_values.get('email'), 'email') if 'email' in new_values else 'N/A'}, "
+            f"phone={sanitize_for_logging(new_values.get('phone'), 'phone') if 'phone' in new_values else 'N/A'}, "
+            f"updated_fields={[f for f in new_values.key() if f not in ['email', 'phone']]}"
+        )
+
         return updated_customer
 
 @router.delete("/customers/{id}", status_code=200)
@@ -180,6 +201,12 @@ async def delete_customer(request: Request, id: int, user_id: int = Depends(veri
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Customer deleted: id={id}, "
+            f"org_id={customer_organization_id}"
+        )
 
         success_dict = {
             "message": f"Customer {id} has been successfully deactivated."

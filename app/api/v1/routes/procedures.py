@@ -1,3 +1,7 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import ProcedureCreate, ProcedureUpdate
@@ -59,6 +63,12 @@ async def create_procedure_route(request: Request, procedure: ProcedureCreate, u
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Procedure created: id={recent_procedure_id}, "
+            f"org_id={procedure.organization_id}"
+        )
 
         success_dict = {
             "message": f"Procedure successfully created. ProcedureID = {recent_procedure_id}, OrgID = {procedure.organization_id}"
@@ -143,6 +153,14 @@ async def update_procedure_route(request: Request, id: int, procedure: Procedure
     )
     # ==== END OF AUDIT LOGS ENTRY ====
 
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"Procedure updated: id={id}, "
+        f"org_id={procedure_organization_id}, "
+        f"price={str(new_values.get('price', 'N/A')) if 'price' in new_values else 'N/A'}, "
+        f"field_changed={list(new_values.keys())}"
+    )
+
     # Return the updated procedure
     return updated_procedure
 
@@ -190,6 +208,12 @@ async def delete_procedure(request: Request, id: int, user_id: int = Depends(ver
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Procedure deleted: id={id}, "
+            f"org_id={procedure_organization_id}"
+        )
 
         success_dict = {
             "message": "Procedure has been successfully deactivated."
