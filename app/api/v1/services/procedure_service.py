@@ -152,6 +152,7 @@ async def list_professional_procedures(organization_id: int, professional_id: in
                 FROM professional_procedures
                 WHERE organization_id = :organization_id
                 AND professional_id = :professional_id
+                AND procedure_id = :procedure_id
                 AND is_active = :is_active
         """
         professional_procedures = await conn.execute(text(search_query), {"organization_id": organization_id, "professional_id": professional_id,
