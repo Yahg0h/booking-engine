@@ -61,12 +61,44 @@ async def search_appointment_by_id(appointment_id: int) -> dict | None:
 
     return appointment
 
-async def list_appointments_by_organization(organization_id: int) -> list[dict] | None:
+async def list_appointments_filtered(organization_id: int | None,
+                                    customer_id: int | None,
+                                    professional_id: int | None,
+                                    procedure_id: int | None,
+                                    start_at: datetime | None,
+                                    end_at: datetime | None,
+                                    status: str | None,
+) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM appointments WHERE organization_id = :organization_id"), {"organization_id": organization_id})
-        results = query.mappings().all()
+        query = "SELECT * FROM appointments WHERE 1=1"
+        params = {}
 
-        registered_appointments = [dict(appoint_row) for appoint_row in results]
+        if organization_id is not None:
+            query += " AND organization_id = :organization_id"
+            params["organization_id"] = organization_id
+        if customer_id is not None:
+            query += " AND customer_id = :customer_id"
+            params["customer_id"] = customer_id
+        if professional_id is not None:
+            query += " AND professional_id = :professional_id"
+            params["professional_id"] = professional_id
+        if procedure_id is not None:
+            query += " AND procedure_id = :procedure_id"
+            params["procedure_id"] = procedure_id
+        if start_at is not None:
+            query += " AND start_at = :start_at"
+            params["start_at"] = start_at
+        if end_at is not None:
+            query += " AND end_at = :end_at"
+            params["end_at"] = end_at
+        if status is not None:
+            query += " AND status = :status"
+            params["status"] = status
+
+        results = await conn.execute(text(query), params)
+        appointments = results.mappings().all()
+
+        registered_appointments = [dict(appoint_row) for appoint_row in appointments]
 
     return registered_appointments
 

@@ -11,7 +11,7 @@ from app.api.v1.services.appointment_service import (
     appointment_canceled,
     check_appointment_access,
     create_appointment,
-    list_appointments_by_organization,
+    list_appointments_filtered,
     search_appointment_by_id,
     update_appointments,
 )
@@ -107,13 +107,21 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
         return success_dict
 
 @router.get("/appointments", status_code=200)
-async def list_appointments(organization_id: int, user_id: int = Depends(verify_user_token)):
+async def list_appointments(organization_id: int,
+                            customer_id: int | None,
+                            professional_id: int | None,
+                            procedure_id: int | None,
+                            start_at: datetime | None,
+                            end_at: datetime | None,
+                            status: str | None,
+                            user_id: int = Depends(verify_user_token)):
     # Check access
     if not await check_appointment_access(user_id, organization_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
-    # Else, list all registered appointments in the organization
-    registered_appointments = await list_appointments_by_organization(organization_id)
+    # Else, list all registered appointments in the organization/ mudar
+    registered_appointments = await list_appointments_filtered(organization_id, customer_id, professional_id,
+                                                               procedure_id, start_at, end_at, status)
 
     return registered_appointments
 

@@ -91,7 +91,7 @@ async def list_users_by_role(role: str, is_active: bool = True) -> list[dict] | 
 
         return registered_role_users
 
-async def list_users_filtered(organization_id: int | None, role: int | None, is_active: bool | None, user_role: int) -> list[dict] | None:
+async def list_users_filtered(organization_id: int | None, role: int | None, is_active: bool | None, user_role: str) -> list[dict] | None:
     async with engine.connect() as conn:
         query = "SELECT * FROM users WHERE 1=1"
         params = {}

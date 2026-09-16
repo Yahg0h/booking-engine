@@ -4,6 +4,8 @@ from app.logging_config import sanitize_for_logging
 
 logger = logging.getLogger(__name__)
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import CustomerCreate, CustomerUpdate
@@ -13,7 +15,7 @@ from app.api.v1.services.customer_service import (
     change_customer_is_active,
     check_customer_access,
     create_customer,
-    list_customers_by_organization,
+    list_customers_filtered,
     search_customer_by_id,
     update_customers,
 )
@@ -73,13 +75,22 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
         return success_dict
 
 @router.get("/customers", status_code=200)
-async def list_customers(organization_id: int, is_active: bool = True, user_id: int = Depends(verify_user_token)):
+async def list_customers(organization_id: int,
+                         email: str | None,
+                         phone: str | None,
+                         last_appointment_at: datetime | None,
+                         is_active: bool = True,
+                         user_id: int = Depends(verify_user_token)):
     # Check access (root + owner + staff)
     if not await check_customer_access(user_id, organization_id, allow_staff=True):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information")
 
     # Else, get all customers registered under the organization
-    registered_customers = await list_customers_by_organization(organization_id, is_active=is_active)
+    registered_customers = await list_customers_filtered(organization_id,
+                                                         email,
+                                                         phone,
+                                                         last_appointment_at,
+                                                         is_active=is_active)
 
     # Return registered_customers
     return registered_customers
