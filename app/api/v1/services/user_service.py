@@ -53,9 +53,9 @@ async def search_user_by_id(id: int) -> dict | None:
 
         return results
 
-async def list_all_users() -> list[dict] | None:
+async def list_all_users(is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM users"))
+        query = await conn.execute(text("SELECT * FROM users WHERE is_active = :is_active"), {"is_active": is_active})
         results = query.mappings().all()
 
         if not results:
@@ -65,9 +65,10 @@ async def list_all_users() -> list[dict] | None:
 
         return registered_users
 
-async def list_users_by_organization(organization_id: int) -> list[dict] | None:
+async def list_users_by_organization(organization_id: int, is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM users WHERE organization_id = :organization_id"), {"organization_id": organization_id})
+        query = await conn.execute(text("SELECT * FROM users WHERE organization_id = :organization_id AND is_active = :is_active"),
+                                   {"organization_id": organization_id, "is_active": is_active})
         results = query.mappings().all()
 
         if not results:
@@ -77,9 +78,10 @@ async def list_users_by_organization(organization_id: int) -> list[dict] | None:
 
         return registered_org_users
 
-async def list_users_by_role(role: str) -> list[dict] | None:
+async def list_users_by_role(role: str, is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM users WHERE role = :role"), {"role": role})
+        query = await conn.execute(text("SELECT * FROM users WHERE role = :role AND is_active = :is_active"),
+                                   {"role": role, "is_active": is_active})
         results = query.mappings().all()
 
         if not results:
