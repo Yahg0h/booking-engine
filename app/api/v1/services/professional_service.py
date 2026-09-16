@@ -44,13 +44,6 @@ async def search_professional_by_user_id(user_id: int) -> dict | None:
 
     return pro_dict
 
-async def search_professionals_by_name(name: str) -> dict | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM professionals WHERE name LIKE :name"), {"name": name})
-        results = query.mappings().one_or_none()
-
-    return results
-
 async def list_professionals_by_org(organization_id: int, is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
         query = await conn.execute(text("SELECT * FROM professionals WHERE organization_id = :organization_id AND is_active = :is_active"),
@@ -167,15 +160,6 @@ async def list_active_working_hours_by_professional(professional_id: int, is_act
             if isinstance(row_dict['end_time'], timedelta):
                 row_dict['end_time'] = (datetime.min + row_dict['end_time']).time()
             registered_wks.append(row_dict)
-
-    return registered_wks
-
-async def list_all_working_hours(is_active: bool = True) -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM working_hours WHERE is_active = :is_active"), {"is_active": is_active})
-        results = query.mappings().all()
-
-        registered_wks = [dict(wk_row) for wk_row in results]
 
     return registered_wks
 

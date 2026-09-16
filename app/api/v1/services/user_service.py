@@ -91,18 +91,6 @@ async def list_users_by_role(role: str, is_active: bool = True) -> list[dict] | 
 
         return registered_role_users
 
-async def list_user_by_status(is_active: bool) -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM users WHERE is_active = :is_active"), {"is_active": is_active})
-        results = query.mappings().all()
-
-        if not results:
-            return None
-
-        users_with_status = [dict(user_row) for user_row in results]
-
-        return users_with_status
-
 async def list_users_filtered(organization_id: int | None, role: int | None, is_active: bool | None, user_role: int) -> list[dict] | None:
     async with engine.connect() as conn:
         query = "SELECT * FROM users WHERE 1=1"

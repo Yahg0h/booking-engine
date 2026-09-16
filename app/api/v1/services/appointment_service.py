@@ -70,51 +70,6 @@ async def list_appointments_by_organization(organization_id: int) -> list[dict] 
 
     return registered_appointments
 
-async def list_appointments_by_customer(customer_id: int) -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM appointments WHERE customer_id = :customer_id"), {"customer_id": customer_id})
-        results = query.mappings().all()
-
-        registered_appointments = [dict(appoint_row) for appoint_row in results]
-        
-    return registered_appointments
-
-async def list_appointments_by_professional(professional_id: int) -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM appointments WHERE professional_id = :professional_id"), {"professional_id": professional_id})
-        results = query.mappings().all()
-        
-        registered_appointments = [dict(appoint_row) for appoint_row in results]
-        
-    return registered_appointments
-
-async def list_appointments_by_procedure(procedure_id: int) -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM appointments WHERE procedure_id = :procedure_id"), {"procedure_id": procedure_id})
-        results = query.mappings().all()
-        
-        registered_appointments = [dict(appoint_row) for appoint_row in results]
-        
-    return registered_appointments
-
-async def list_appointments_by_time_frame(organization_id: int, professional_id: int, start_at: datetime, end_at: datetime) -> list[dict] | None:
-    async with engine.connect() as conn:
-        search_query = """
-            SELECT id, start_at, end_at
-            FROM appointments
-            WHERE organization_id = :organization_id
-              AND professional_id = :professional_id
-              AND start_at < :end_at
-              AND end_at > :start_at
-        """
-        query = await conn.execute(text(search_query), {"organization_id": organization_id, "professional_id": professional_id,
-                                                        "start_at": start_at, "end_at": end_at})
-        results = query.mappings().all()
-
-        registered_appointments = [dict(appoint_row) for appoint_row in results]
-                
-    return registered_appointments
-
 async def update_appointments(id: int, organization_id: int, customer_id: int,
                                professional_id: int, procedure_id: int, start_at: datetime | None,
                                end_at: datetime | None, status: str | None, notes: str | None) -> dict | None:
