@@ -37,13 +37,36 @@ async def search_customer_by_id(customer_id: int) -> dict | None:
 
     return results
 
-async def list_customers_by_organization(organization_id: int, is_active: bool = True) -> list[dict] | None:
+async def list_customers_filtered(organization_id: int,
+                                  email: str | None,
+                                  phone: str | None,
+                                  last_appointment_at: datetime | None,
+                                  is_active: bool = True
+) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM customers WHERE organization_id = :organization_id AND is_active = :is_active"),
-                                   {"organization_id": organization_id, "is_active": is_active})
-        results = query.mappings().all()
+        query = "SELECT * FROM customers WHERE 1=1"
+        params = {}
 
-        registered_customers = [dict(customer_row) for customer_row in results]
+        if organization_id is not None:
+            query += " AND organization_id = :organization_id"
+            params["organization_id"] = organization_id
+        if email is not None:
+            query += " AND email = :email"
+            params["email"] = email
+        if phone is not None:
+            query += " AND phone = :phone"
+            params["phone"] = phone
+        if last_appointment_at is not None:
+            query += " AND last_appointment_at = :last_appointment_at"
+            params["last_appointment_at"] = last_appointment_at
+        if is_active is not None:
+            query += " AND is_active = :is_active"
+            params["is_active"] = is_active
+
+        results = await conn.execute(text(query), params)
+        customers = results.mappings().all()
+
+        registered_customers = [dict(customer_row) for customer_row in customers]
 
     return registered_customers
 
