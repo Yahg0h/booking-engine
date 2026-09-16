@@ -44,25 +44,19 @@ async def search_professional_by_user_id(user_id: int) -> dict | None:
 
     return pro_dict
 
-async def search_professionals_by_name(name: str) -> dict | None:
+async def list_professionals_by_org(organization_id: int, is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM professionals WHERE name LIKE :name"), {"name": name})
-        results = query.mappings().one_or_none()
-
-    return results
-
-async def list_professionals_by_org(organization_id: int) -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM professionals WHERE organization_id = :organization_id"), {"organization_id": organization_id})
+        query = await conn.execute(text("SELECT * FROM professionals WHERE organization_id = :organization_id AND is_active = :is_active"),
+                                   {"organization_id": organization_id, "is_active": is_active})
         professionals = query.mappings().all()
 
         registered_professionals = [dict(pro_dict) for pro_dict in professionals]
 
     return registered_professionals
 
-async def list_all_professionals() -> list[dict] | None:
+async def list_all_professionals(is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM professionals"))
+        query = await conn.execute(text("SELECT * FROM professionals WHERE is_active = :is_active"), {"is_active": is_active})
         professionals = query.mappings().all()
 
         registered_professionals = [dict(pro_dict) for pro_dict in professionals]
@@ -141,9 +135,10 @@ async def search_working_hour_by_id(id: int) -> dict | None:
 
     return working_hour
 
-async def list_working_hours_by_professional(professional_id: int) -> list[dict] | None:
+async def list_working_hours_by_professional(professional_id: int, is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM working_hours WHERE professional_id = :professional_id"), {"professional_id": professional_id})
+        query = await conn.execute(text("SELECT * FROM working_hours WHERE professional_id = :professional_id AND is_active = :is_active"),
+                                   {"professional_id": professional_id, "is_active": is_active})
         results = query.mappings().all()
 
         registered_wks = [dict(wk_row) for wk_row in results]
@@ -165,15 +160,6 @@ async def list_active_working_hours_by_professional(professional_id: int, is_act
             if isinstance(row_dict['end_time'], timedelta):
                 row_dict['end_time'] = (datetime.min + row_dict['end_time']).time()
             registered_wks.append(row_dict)
-
-    return registered_wks
-
-async def list_all_working_hours() -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM working_hours"))
-        results = query.mappings().all()
-
-        registered_wks = [dict(wk_row) for wk_row in results]
 
     return registered_wks
 

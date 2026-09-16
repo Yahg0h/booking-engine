@@ -35,25 +35,6 @@ async def search_organization_by_id(id: int) -> dict | None:
 
     return results
 
-async def search_organizations_by_name(name: str) -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM organizations WHERE name LIKE :name"), {"name": name})
-        results = query.mappings().all()
-
-        if not results:
-            return None
-
-        registered_organizations = [dict(org_dict) for org_dict in results]
-
-    return registered_organizations
-
-async def search_organization_by_slug(slug: str) -> dict | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM organizations WHERE slug LIKE :slug"), {"slug": slug})
-        results = query.mappings().one_or_none()
-
-    return results
-
 async def list_all_organizations() -> list[dict] | None:
     async with engine.connect() as conn:
         query = await conn.execute(text("SELECT * FROM organizations"))

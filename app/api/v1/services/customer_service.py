@@ -37,23 +37,10 @@ async def search_customer_by_id(customer_id: int) -> dict | None:
 
     return results
 
-async def search_customer_by_email(email: str) -> dict | None:
+async def list_customers_by_organization(organization_id: int, is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM customers WHERE email = :email"), {"email": email})
-        results = query.mappings().one_or_none()
-
-    return results
-
-async def search_customer_by_phone(phone: str) -> dict | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM customers WHERE phone = :phone"), {"phone": phone})
-        results = query.mappings().one_or_none()
-
-    return results
-
-async def list_customers_by_organization(organization_id: int) -> list[dict] | None:
-    async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM customers WHERE organization_id = :organization_id"), {"organization_id": organization_id})
+        query = await conn.execute(text("SELECT * FROM customers WHERE organization_id = :organization_id AND is_active = :is_active"),
+                                   {"organization_id": organization_id, "is_active": is_active})
         results = query.mappings().all()
 
         registered_customers = [dict(customer_row) for customer_row in results]

@@ -78,7 +78,7 @@ async def create_procedure_route(request: Request, procedure: ProcedureCreate, u
 
 # READ all procedures offered by a organization (public route)
 @router.get("/procedures/organization/{id}", status_code=200)
-async def get_procedures_by_organization(id: int, user_id: int = Depends(get_current_user_optional)):
+async def get_procedures_by_organization(id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
     # Check if the organization exists
     is_org_exist = await search_organization_by_id(id)
 
@@ -87,7 +87,7 @@ async def get_procedures_by_organization(id: int, user_id: int = Depends(get_cur
         raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
 
     # Get all registered procedures under a organization
-    registered_procedures = await list_procedures_by_org(id)
+    registered_procedures = await list_procedures_by_org(id, is_active=is_active)
 
     # Return procedures
     return registered_procedures

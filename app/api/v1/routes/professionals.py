@@ -105,26 +105,26 @@ async def create_professional_route(request: Request, professional: Professional
 
 # READ all professionals in a organization
 @router.get("/professionals", status_code=200)
-async def get_professionals(organization_id: int, user_id: int = Depends(verify_user_token)):
+async def get_professionals(organization_id: int, is_active: bool = True, user_id: int = Depends(verify_user_token)):
     # Check if the current user is a OWNER of the selected organization or root; If the conditions fail, return 403
     if not await check_professional_access(user_id, organization_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
 
     # Else, get all professionals registered under this organization
-    professionals = await list_professionals_by_org(organization_id)
+    professionals = await list_professionals_by_org(organization_id, is_active=is_active)
 
     # Return list
     return professionals
 
 # READ all professionals registered across all registered organizations (root-only)
 @router.get("/professionals/all", status_code=200)
-async def get_all_professionals(user_id: int = Depends(verify_user_token)):
+async def get_all_professionals(is_active: bool = True, user_id: int = Depends(verify_user_token)):
     # Check if the current user is a root account; If it isn't, return 403
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
 
     # Else, get all registered professionals registered
-    professionals = await list_all_professionals()
+    professionals = await list_all_professionals(is_active=is_active)
 
     # Return list
     return professionals
@@ -353,7 +353,7 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
 
 # READ all working hours of a professional (public route)
 @router.get("/professionals/{professional_id}/working-hours", status_code=200)
-async def get_working_hours_by_professional(professional_id: int, user_id: int = Depends(get_current_user_optional)):
+async def get_working_hours_by_professional(professional_id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
     # Check if the professional exists
     is_exist = await search_professional_by_id(professional_id)
 
@@ -362,7 +362,7 @@ async def get_working_hours_by_professional(professional_id: int, user_id: int =
         raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
 
     # Else, get all working hours registered under a professional
-    registered_wks = await list_working_hours_by_professional(professional_id)
+    registered_wks = await list_working_hours_by_professional(professional_id, is_active=is_active)
 
     # Return wks list
     return registered_wks
@@ -622,7 +622,7 @@ async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedur
 
 # READ all procedures offered by a professional (public route)
 @router.get("/professionals/{id}/procedures", status_code=200)
-async def get_procedures_by_professionals(id: int, user_id: int = Depends(get_current_user_optional)):
+async def get_procedures_by_professionals(id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
     # Check if professional exists
     professional_exists = await search_professional_by_id(id)
     
@@ -634,7 +634,7 @@ async def get_procedures_by_professionals(id: int, user_id: int = Depends(get_cu
     organization_id = professional_exists["organization_id"]
 
     # Get all procedures made by this
-    registered_pps = await list_professional_procedures(organization_id, id, None)
+    registered_pps = await list_professional_procedures(organization_id, id, None, is_active=is_active)
 
     return registered_pps
 

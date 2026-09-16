@@ -1,24 +1,16 @@
 import logging
 
-from app.logging_config import sanitize_for_logging
-
 logger = logging.getLogger(__name__)
 
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import text
 
-from app.api.v1.schemas.schemas import UserCreate, UserLogin, UserResponse
+from app.api.v1.schemas.schemas import UserCreate, UserLogin
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import (
     authenticate_user,
     create_jwt_token,
-    decode_token,
     get_current_user_optional,
-    hash_password,
-    verify_password,
-    verify_user_token,
 )
 from app.api.v1.services.user_service import (
     check_user_role,

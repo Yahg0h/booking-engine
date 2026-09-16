@@ -73,13 +73,13 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
         return success_dict
 
 @router.get("/customers", status_code=200)
-async def list_customers(organization_id: int, user_id: int = Depends(verify_user_token)):
+async def list_customers(organization_id: int, is_active: bool = True, user_id: int = Depends(verify_user_token)):
     # Check access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
 
     # Else, get all customers registered under the organization
-    registered_customers = await list_customers_by_organization(organization_id)
+    registered_customers = await list_customers_by_organization(organization_id, is_active=is_active)
 
     # Return registered_customers
     return registered_customers

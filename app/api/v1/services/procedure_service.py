@@ -39,9 +39,10 @@ async def search_procedure_by_id(id: int) -> dict | None:
 
     return procedure
 
-async def list_procedures_by_org(organization_id: int) -> list[dict] | None:
+async def list_procedures_by_org(organization_id: int, is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
-        query = await conn.execute(text("SELECT * FROM procedures WHERE organization_id = :organization_id"), {"organization_id": organization_id})
+        query = await conn.execute(text("SELECT * FROM procedures WHERE organization_id = :organization_id AND is_active = :is_active"),
+                                   {"organization_id": organization_id, "is_active": is_active})
         results = query.mappings().all()
 
         registered_procedures = [dict(proc_row) for proc_row in results]
@@ -120,39 +121,18 @@ async def search_professional_procedure_unique(organization_id: int, professiona
 
     return results
 
-async def list_procedures_by_professionals(organization_id: int, professional_id: int) -> list[dict] | None:
-    async with engine.connect() as conn:
-        search_query = """
-        SELECT * FROM professional_procedures WHERE organization_id = :organization_id AND professional_id = :professional_id
-        """
-        professional_procedures = await conn.execute(text(search_query), {"organization_id": organization_id, "professional_id": professional_id})
-        results = professional_procedures.mappings().all()
-
-        registered_pp = [dict(pp_dict) for pp_dict in results]
-
-    return registered_pp
-
-async def list_professionals_by_procedures(organization_id: int, procedure_id: int) -> list[dict] | None:
-    async with engine.connect() as conn:
-        search_query = """
-        SELECT * FROM professional_procedures WHERE organization_id = :organization_id AND procedure_id = :procedure_id
-        """
-        professional_procedures = await conn.execute(text(search_query), {"organization_id": organization_id, "procedure_id": procedure_id})
-        results = professional_procedures.mappings().all()
-
-        registered_pp = [dict(pp_dict) for pp_dict in results]
-
-    return registered_pp
-
-async def list_professional_procedures(organization_id: int, professional_id: int | None, procedure_id: int | None) -> list[dict] | None:
+async def list_professional_procedures(organization_id: int, professional_id: int | None, procedure_id: int | None, is_active: bool = True) -> list[dict] | None:
     async with engine.connect() as conn:
         search_query = """
             SELECT *
                 FROM professional_procedures
                 WHERE organization_id = :organization_id
                 AND professional_id = :professional_id
+                AND procedure_id = :procedure_id
+                AND is_active = :is_active
         """
-        professional_procedures = await conn.execute(text(search_query), {"organization_id": organization_id, "professional_id": professional_id, "procedure_id": procedure_id})
+        professional_procedures = await conn.execute(text(search_query), {"organization_id": organization_id, "professional_id": professional_id,
+                                                                          "procedure_id": procedure_id, "is_active": is_active})
         results = professional_procedures.mappings().all()
 
         registered_pp = [dict(pp_dict) for pp_dict in results]
