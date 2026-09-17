@@ -76,9 +76,9 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
 
 @router.get("/customers", status_code=200)
 async def list_customers(organization_id: int,
-                         email: str | None,
-                         phone: str | None,
-                         last_appointment_at: datetime | None,
+                         email: str | None = None,
+                         phone: str | None = None,
+                         last_appointment_at: datetime | None = None,
                          is_active: bool = True,
                          user_id: int = Depends(verify_user_token)):
     # Check access (root + owner + staff)
@@ -164,7 +164,7 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
             f"org_id={customer_organization_id}, "
             f"email={sanitize_for_logging(new_values.get('email'), 'email') if 'email' in new_values else 'N/A'}, "
             f"phone={sanitize_for_logging(new_values.get('phone'), 'phone') if 'phone' in new_values else 'N/A'}, "
-            f"updated_fields={[f for f in new_values.key() if f not in ['email', 'phone']]}"
+            f"updated_fields={[f for f in new_values.keys() if f not in ['email', 'phone']]}"
         )
 
         return updated_customer
