@@ -69,9 +69,11 @@ async def client():
     import app.api.v1.services.audit_service as audit_svc
     import app.api.v1.services.organization_service as org_svc
     import app.api.v1.services.permission_service as perm_svc
+    import app.api.v1.services.procedure_service as procedure_svc
+    import app.api.v1.services.professional_service as professional_svc
     import app.api.v1.services.user_service as user_svc
 
-    svc_modules = [user_svc, org_svc, perm_svc, audit_svc]
+    svc_modules = [user_svc, org_svc, perm_svc, audit_svc, professional_svc, procedure_svc]
     for module in svc_modules:
         if hasattr(module, 'engine'):
             module.engine = test_engine
