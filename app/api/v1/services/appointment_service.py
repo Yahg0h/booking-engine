@@ -102,6 +102,24 @@ async def list_appointments_filtered(organization_id: int | None,
 
     return registered_appointments
 
+async def list_appointments_by_time_frame(organization_id: int, professional_id: int, start_at: datetime, end_at: datetime) -> list[dict] | None:
+    async with engine.connect() as conn:
+        search_query = """
+            SELECT id, start_at, end_at
+            FROM appointments
+            WHERE organization_id = :organization_id
+              AND professional_id = :professional_id
+              AND start_at < :end_at
+              AND end_at > :start_at
+        """
+        query = await conn.execute(text(search_query), {"organization_id": organization_id, "professional_id": professional_id,
+                                                        "start_at": start_at, "end_at": end_at})
+        results = query.mappings().all()
+
+        registered_appointments = [dict(appoint_row) for appoint_row in results]
+                
+    return registered_appointments
+
 async def update_appointments(id: int, organization_id: int, customer_id: int,
                                professional_id: int, procedure_id: int, start_at: datetime | None,
                                end_at: datetime | None, status: str | None, notes: str | None) -> dict | None:
