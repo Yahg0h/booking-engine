@@ -1,0 +1,166 @@
+name: CI - Automated Tests
+
+on:
+  push:
+    branches: [ main, develop, "feature/**" ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_DATABASE: booking_engine_test
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_PASSWORD: test
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        ports:
+          - 3306:3306
+
+      redis:
+        image: redis:latest
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+        ports:
+          - 6379:6379
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Setup Python
+      - name: Setup Python 3.14
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.14'
+          cache: 'pip'
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio pytest-cov ruff mypy aiomysql pymysql
+
+      # 4. Wait MySQL be ready
+      - name: Wait MySQL be ready
+        run: |
+          python -c "
+          import time
+          import asyncio
+          import aiomysql
+
+          async def wait_for_mysql():
+            for i in range(30):
+              try:
+                conn = await aiomysql.connect(host='127.0.0.1', user='root', password='root')
+                await conn.close()
+                print('✅ MySQL is ready')
+                return
+              except:
+                if i < 29:
+                  print(f'⏳ Trying to connect ({i+1}/30)...')
+                  await asyncio.sleep(1)
+
+          asyncio.run(wait_for_mysql())
+          "
+
+      # 5. Wait Redis be ready
+      - name: Wait Redis be ready
+        run: |
+          python -c "
+          import time
+          import redis
+
+          for i in range(30):
+            try:
+              r = redis.Redis(host='127.0.0.1', port=6379, db=0)
+              r.ping()
+              print('✅ Redis is ready')
+              break
+            except Exception:
+              if i < 29:
+                print(f'⏳ Trying to connect ({i+1}/30)...')
+                time.sleep(1)
+          "
+
+      # 6. Create test database and apply schema
+      - name: Create test database and apply schema
+        run: |
+          python -c "
+          import pymysql
+
+          conn = pymysql.connect(host='127.0.0.1', user='root', password='root')
+          cursor = conn.cursor()
+
+          cursor.execute('CREATE DATABASE IF NOT EXISTS booking_engine_test')
+          cursor.execute('USE booking_engine_test')
+
+          with open('schema.sql', 'r', encoding='utf-8') as f:
+              schema_sql = f.read()
+
+          for statement in schema_sql.split(';'):
+              stmt = statement.strip()
+              if stmt:
+                  cursor.execute(stmt)
+
+          conn.commit()
+          cursor.close()
+          conn.close()
+          print('✅ Test database and tables successfully created')
+          "
+
+      # 7. Run tests
+      - name: Run tests
+        run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=term-missing
+        env:
+          DB_USER: "root"
+          DB_PASSWORD: "root"
+          DB_HOST: "127.0.0.1"
+          DB_PORT: "3306"
+          DB_NAME: "booking_engine_test"
+          JWT_SECRET: "testsecret"
+          REDIS_HOST: "127.0.0.1"
+          REDIS_PORT: "6379"
+          REDIS_DB: "0"
+          REDIS_SECRET_KEY: "testredissecret"
+
+      # 8. Upload coverage to Codecov
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      # 9. Lint with Ruff
+      - name: Lint with Ruff
+        run: |
+          ruff check app/ tests/ --select=E,W,F --show-source --statistics
+        continue-on-error: true
+
+      # 10. Type checking with Mypy
+      - name: Type checking with Mypy
+        run: |
+          mypy app/ --ignore-missing-imports --no-error-summary 2>/dev/null || true
+        continue-on-error: true
+
+      # 11. Summary
+      - name: 📊 Test summary
+        if: always()
+        run: |
+          echo "✅ CI pipeline finished!"
+          echo "📌 Verify logs for details"
