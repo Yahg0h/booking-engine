@@ -105,8 +105,8 @@ jobs:
           conn = pymysql.connect(host='127.0.0.1', user='root', password='root')
           cursor = conn.cursor()
 
-          cursor.execute('CREATE DATABASE IF NOT EXISTS booking_engine_test')
-          cursor.execute('USE booking_engine_test')
+          cursor.execute('CREATE DATABASE IF NOT EXISTS booking_engine')
+          cursor.execute('USE booking_engine')
 
           with open('schema.sql', 'r', encoding='utf-8') as f:
               schema_sql = f.read()
@@ -130,7 +130,7 @@ jobs:
           DB_PASSWORD: "root"
           DB_HOST: "127.0.0.1"
           DB_PORT: "3306"
-          DB_NAME: "booking_engine_test"
+          DB_NAME: "booking_engine"
           JWT_SECRET: "testsecret"
           REDIS_HOST: "127.0.0.1"
           REDIS_PORT: "6379"
