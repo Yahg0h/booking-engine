@@ -75,9 +75,9 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
 
 @router.get("/customers", status_code=200)
 async def list_customers(organization_id: int,
-                         email: str | None,
-                         phone: str | None,
-                         last_appointment_at: datetime | None,
+                         email: str | None = None,
+                         phone: str | None = None,
+                         last_appointment_at: datetime | None = None,
                          is_active: bool = True,
                          user_id: int = Depends(verify_user_token)):
     # Check access

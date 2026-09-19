@@ -108,12 +108,12 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
 
 @router.get("/appointments", status_code=200)
 async def list_appointments(organization_id: int,
-                            customer_id: int | None,
-                            professional_id: int | None,
-                            procedure_id: int | None,
-                            start_at: datetime | None,
-                            end_at: datetime | None,
-                            status: str | None,
+                            customer_id: int | None = None,
+                            professional_id: int | None = None,
+                            procedure_id: int | None = None,
+                            start_at: datetime | None = None,
+                            end_at: datetime | None = None,
+                            status: str | None = None,
                             user_id: int = Depends(verify_user_token)):
     # Check access
     if not await is_root(user_id):
