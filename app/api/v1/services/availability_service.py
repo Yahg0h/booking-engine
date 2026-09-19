@@ -1,3 +1,7 @@
+"""
+Service logic for calculating professional availability slots.
+"""
+
 from datetime import date, datetime, time, timedelta
 
 from app.api.v1.services.appointment_service import list_appointments_by_time_frame

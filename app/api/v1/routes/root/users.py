@@ -1,3 +1,6 @@
+"""
+Routes for root-level user administration.
+"""
 import logging
 
 from app.logging_config import sanitize_for_logging
@@ -29,6 +32,20 @@ router = APIRouter(prefix="/v1/root")
 # CREATE a new account
 @router.post("/users", status_code=201)
 async def create_account(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
+    """
+    Creates a new user account for the root administrator.
+
+    Args:
+        request: The FastAPI request object
+        user: The user creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the user account was created
+
+    Raises:
+        HTTPException: If the current user is not a root administrator, if the email is already registered, or if an invalid root account attempt is made
+    """
     # Check root access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -93,6 +110,18 @@ async def create_account(request: Request, user: UserCreate, user_id: int | None
 # READ all users information
 @router.get("/users", status_code=200)
 async def get_users(user_id: int | None = Depends(verify_user_token)):
+    """
+    Lists all user accounts across the system.
+
+    Args:
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of all registered users
+
+    Raises:
+        HTTPException: If the current user is not authorized to access the resource
+    """
     # Check root access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -106,6 +135,19 @@ async def get_users(user_id: int | None = Depends(verify_user_token)):
 # Read a specific user information
 @router.get("/users/{id}", status_code=200)
 async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
+    """
+    Retrieves information about a specific user by ID.
+
+    Args:
+        id: The ID of the user
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The user information
+
+    Raises:
+        HTTPException: If the user is not found or if the current user is not authorized to access it
+    """
     # Get the selected users information
     user_info = await search_user_by_id(id)
 
@@ -122,6 +164,21 @@ async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
 # UPDATE a user's information
 @router.patch("/users/{id}", status_code=200)
 async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin, user_id: int | None = Depends(verify_user_token)):
+    """
+    Updates a user's information from an administrator perspective.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the user being updated
+        user: The admin user update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated user information
+
+    Raises:
+        HTTPException: If the user is not found, if the current user is not authorized to access the resource, or if the update operation fails
+    """
     # Get the selected user's organization id
     user_info = await search_user_by_id(id)
 
@@ -184,6 +241,20 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
 
 @router.delete("/users/{id}", status_code=200)
 async def delete_user(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
+    """
+    Deactivates an existing user account.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the user to deactivate
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the user account was deactivated
+
+    Raises:
+        HTTPException: If the user is not found or if the current user is not authorized to access the resource
+    """
     # Get the selected user's organization id
     user_info = await search_user_by_id(id)
 

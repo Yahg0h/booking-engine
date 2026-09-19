@@ -1,3 +1,6 @@
+"""
+Routes for managing procedures.
+"""
 import logging
 
 logger = logging.getLogger(__name__)
@@ -26,6 +29,20 @@ router = APIRouter(prefix="/v1")
 # CREATE a procedure
 @router.post("/procedures", status_code=201)
 async def create_procedure_route(request: Request, procedure: ProcedureCreate, user_id: int = Depends(verify_user_token)):
+    """
+    Creates a new procedure.
+
+    Args:
+        request: The FastAPI request object
+        procedure: The procedure creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message with the created procedure ID
+
+    Raises:
+        HTTPException: If access is denied
+    """
     # Check if the current user is the OWNER of the selected organization or root; If it isn't, return 403
     if not await check_procedure_access(user_id, procedure.organization_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -79,6 +96,20 @@ async def create_procedure_route(request: Request, procedure: ProcedureCreate, u
 # READ all procedures offered by a organization (public route)
 @router.get("/procedures/organization/{id}", status_code=200)
 async def get_procedures_by_organization(id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
+    """
+    Lists all procedures offered by an organization.
+
+    Args:
+        id: The ID of the organization
+        is_active: The status filter
+        user_id: The ID of the authenticated user (optional)
+
+    Returns:
+        list: A list of registered procedures
+
+    Raises:
+        HTTPException: If the organization is not found
+    """
     # Check if the organization exists
     is_org_exist = await search_organization_by_id(id)
 
@@ -95,6 +126,19 @@ async def get_procedures_by_organization(id: int, is_active: bool = True, user_i
 # READ the information of a procedure (public route)
 @router.get("/procedures/{id}", status_code=200)
 async def get_procedure(id: int, user_id: int = Depends(get_current_user_optional)):
+    """
+    Retrieves information about a specific procedure by ID.
+
+    Args:
+        id: The ID of the procedure
+        user_id: The ID of the authenticated user (optional)
+
+    Returns:
+        dict: The procedure information
+
+    Raises:
+        HTTPException: If the procedure is not found
+    """
     # Check if the procedure exist
     procedure = await search_procedure_by_id(id)
 
@@ -108,6 +152,21 @@ async def get_procedure(id: int, user_id: int = Depends(get_current_user_optiona
 # UPDATE a procedures information
 @router.patch("/procedures/{id}", status_code=200)
 async def update_procedure_route(request: Request, id: int, procedure: ProcedureUpdate, user_id: int = Depends(verify_user_token)):
+    """
+    Updates the information of an existing procedure.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the procedure
+        procedure: The procedure update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated procedure information
+
+    Raises:
+        HTTPException: If the procedure is not found or if access is denied
+    """
     # Check if the current user is the OWNER of the selected organization or root
     procedure_info = await search_procedure_by_id(id)
 
@@ -167,6 +226,20 @@ async def update_procedure_route(request: Request, id: int, procedure: Procedure
 # DELETE a procedures information
 @router.delete("/procedures/{id}", status_code=200)
 async def delete_procedure(request: Request, id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Deactivates an existing procedure.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the procedure
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message
+
+    Raises:
+        HTTPException: If the procedure is not found or if access is denied
+    """
     # Check if the current user is the OWNER of the selected organization or root
     procedure_info = await search_procedure_by_id(id)
 

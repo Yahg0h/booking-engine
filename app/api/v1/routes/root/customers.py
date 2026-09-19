@@ -1,3 +1,6 @@
+"""
+Routes for root-level customer administration.
+"""
 import logging
 
 from app.logging_config import sanitize_for_logging
@@ -24,6 +27,20 @@ router = APIRouter(prefix="/v1/root")
 
 @router.post("/customers", status_code=201)
 async def create_customers(request: Request, customer: CustomerCreate, user_id: int = Depends(verify_user_token)):
+    """
+    Creates a new customer for the root administrator.
+
+    Args:
+        request: The FastAPI request object
+        customer: The customer creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the customer was created
+
+    Raises:
+        HTTPException: If the current user is not authorized to access the resource
+    """
     # Check the current user's access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -80,6 +97,23 @@ async def list_customers(organization_id: int,
                          last_appointment_at: datetime | None = None,
                          is_active: bool = True,
                          user_id: int = Depends(verify_user_token)):
+    """
+    Lists customers based on the provided filters.
+
+    Args:
+        organization_id: The ID of the organization
+        email: The email filter (optional)
+        phone: The phone filter (optional)
+        last_appointment_at: The last appointment date filter (optional)
+        is_active: The customer status filter
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of customers matching the filters
+
+    Raises:
+        HTTPException: If the current user is not authorized to access the resource
+    """
     # Check access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -96,6 +130,19 @@ async def list_customers(organization_id: int,
 
 @router.get("/customers/{id}", status_code=200)
 async def get_customer(id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves information about a specific customer by ID.
+
+    Args:
+        id: The ID of the customer
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The customer information
+
+    Raises:
+        HTTPException: If the customer is not found or if the current user is not authorized to access the resource
+    """
     # Check if the customer exists
     customer = await search_customer_by_id(id)
 
@@ -113,6 +160,21 @@ async def get_customer(id: int, user_id: int = Depends(verify_user_token)):
 
 @router.patch("/customers/{id}", status_code=200)
 async def update_customer(request: Request, id: int, customer_update: CustomerUpdate, user_id: int = Depends(verify_user_token)):
+    """
+    Updates the information of an existing customer.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the customer
+        customer_update: The customer update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated customer information
+
+    Raises:
+        HTTPException: If the customer is not found or if the current user is not authorized to access the resource
+    """
     # Check if the customer exists
     customer = await search_customer_by_id(id)
     
@@ -170,6 +232,20 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
 
 @router.delete("/customers/{id}", status_code=200)
 async def delete_customer(request: Request, id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Deactivates an existing customer.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the customer
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the customer was deactivated
+
+    Raises:
+        HTTPException: If the customer is not found or if the current user is not authorized to access the resource
+    """
     # Check if the customer exists
     customer = await search_customer_by_id(id)
 

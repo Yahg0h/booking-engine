@@ -1,3 +1,6 @@
+"""
+Routes for managing organizations.
+"""
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,6 +24,20 @@ router = APIRouter(prefix="/v1")
 # CREATE a organization (root-account only)
 @router.post("/organizations", status_code=201)
 async def create_org(request: Request, org_data: OrganizationCreate, user_id: int | None = Depends(verify_user_token)):
+    """
+    Creates a new organization.
+
+    Args:
+        request: The FastAPI request object
+        org_data: The organization creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message with the created organization ID
+
+    Raises:
+        HTTPException: If the current user is not a root administrator
+    """
     # Check if the current account is a ROOT account; if it isn't, return 403
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -70,6 +87,19 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
 # READ a organizations info (root and org owner account only)
 @router.get("/organizations/{id}", status_code=200)
 async def get_organization(id: int, user_id: int | None = Depends(verify_user_token)):
+    """
+    Retrieves the details of a specific organization.
+
+    Args:
+        id: The ID of the organization
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The organization information
+
+    Raises:
+        HTTPException: If the organization is not found or if the current user does not have access
+    """
     # Check if the organization exists
     is_real = await search_organization_by_id(id)
 
@@ -88,6 +118,21 @@ async def get_organization(id: int, user_id: int | None = Depends(verify_user_to
 # UPDATE a organization's information (root and org owner account only)
 @router.patch("/organizations/{id}", status_code=200)
 async def update_org(request: Request, id: int, org_data: OrganizationUpdate, user_id: int | None = Depends(verify_user_token)):
+    """
+    Updates the information of an existing organization.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the organization
+        org_data: The organization update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated organization information
+
+    Raises:
+        HTTPException: If the organization is not found or if the current user does not have access
+    """
     # Check if the organization exists
     is_real = await search_organization_by_id(id)
 

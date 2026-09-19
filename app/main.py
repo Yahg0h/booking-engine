@@ -1,11 +1,12 @@
-from app.config import settings
-from app.logging_config import setup_logging
-
-setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)
+"""
+Application entry point to initialize the FastAPI app, configure logging, and register all API routers.
+"""
 
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+from fastapi.security import HTTPBearer
 
 from app.api.v1.routes.appointments import router as appointment_service
 from app.api.v1.routes.auth import router as auth_router
@@ -21,8 +22,14 @@ from app.api.v1.routes.root.procedures import router as root_procedures
 from app.api.v1.routes.root.professionals import router as root_professionals
 from app.api.v1.routes.root.users import router as root_users
 from app.api.v1.routes.users import router as users_router
+from app.config import settings
 from app.database import check_database_connection
+from app.logging_config import setup_logging
 
+# Trigger logging configuration before app initialization
+setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)
+
+# Initialize app
 app = FastAPI(
     title="Booking Engine",
     description="A REST scheduling API designed around dynamic availability and concurrency.",
@@ -30,6 +37,37 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
+# Initialize HTTP Bearer
+security = HTTPBearer()
+
+# Customize OpenAPI schema to include Bearer token
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="Booking Engine API",
+        version="1.0.0",
+        description="Multi-tenant appointment booking REST API",
+        routes=app.routes,
+    )
+    
+    openapi_schema["components"]["securitySchemes"] = {
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    }
+    
+    openapi_schema["security"] = [{"HTTPBearer": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
+# ==== ROUTES ====
 @app.get("/")
 async def root():
     return {
@@ -73,7 +111,7 @@ app.include_router(availability_router)
 
 app.include_router(appointment_service)
 
-# Root routes
+# ==== Include all v1 root routes ====
 app.include_router(root_users)
 app.include_router(root_organizations)
 app.include_router(root_professionals)
