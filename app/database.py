@@ -1,5 +1,5 @@
 """
-Database async connection configuration for TicketPlus + Database status check.
+Database async connection configuration for Booking Engine + Database status check.
 """
 
 from sqlalchemy import text

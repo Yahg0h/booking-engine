@@ -1,5 +1,5 @@
 """
-All services related to audit logs used across all TicketPlus routes.
+All services related to audit logs used across all Booking Engine routes.
 """
 
 import json
@@ -20,6 +20,23 @@ async def log_action(
     metadata: dict | None,
     ip_address: str | None
 ) -> int:
+    """
+    Records an audit log entry for a system action.
+
+    Args:
+        organization_id: The organization context for the audit log
+        actor_user_id: The user who triggered the action
+        action: The action type being recorded
+        entity_type: The resource type affected by the action
+        entity_id: The ID of the affected entity
+        old_values: The previous values before the change
+        new_values: The values after the change
+        metadata: Additional structured context for the log
+        ip_address: The client IP address associated with the action
+
+    Returns:
+        int: The ID of the newly created audit log entry
+    """
     # If there is values, convert them from dict to JSON
     old_values_json = json.dumps(old_values, default=str) if old_values else None
     new_values_json = json.dumps(new_values, default=str) if new_values else None
@@ -57,17 +74,17 @@ async def get_audit_logs(
     action: str | None = None
 ) -> list[dict]:
     """
-    Fetch audit logs with optional filters.
-    
+    Fetches audit logs using optional filters.
+
     Args:
-        limit: Maximum number of logs to return (default 100)
-        offset: Offset for pagination (default 0)
+        limit: Maximum number of logs to return
+        offset: Pagination offset for the result set
         actor_user_id: Filter by user ID (optional)
         entity_type: Filter by resource type (optional)
         action: Filter by action type (optional)
-    
+
     Returns:
-        list: List of audit log dicts
+        list[dict]: A list of audit log dictionaries matching the filters
     """
     # Create a dynamic query that changes based on the filters selected
     query = "SELECT * FROM audit_logs WHERE 1=1"
@@ -104,13 +121,13 @@ async def get_audit_logs(
 # Utility functions related to audit_service
 def get_ip_from_request(request) -> str | None:
     """
-    Extract IP address from FastAPI Request object.
-    
+    Extracts the client IP address from a FastAPI request.
+
     Args:
-        request: FastAPI Request object
-    
+        request: The FastAPI request object
+
     Returns:
-        str or None: IP address or None
+        str | None: The client IP address, or None if it cannot be determined
     """
     # Try fetching the IP address from the client connection
     if request.client and request.client.host:
@@ -126,6 +143,15 @@ def get_ip_from_request(request) -> str | None:
     return None
 
 def sanitize_audit_values(data: dict | None) -> dict | None:
+    """
+    Removes sensitive values from audit payloads before logging.
+
+    Args:
+        data: The raw dictionary payload to sanitize
+
+    Returns:
+        dict | None: A sanitized dictionary without password hashes, or None if no data is provided
+    """
     if not data:
         return None
     

@@ -17,7 +17,13 @@ from app.config import settings
 
 def create_jwt_token(user_id: int) -> str:
     """
-    Create a JWT token with expiration.
+    Creates a JWT token for a user session.
+
+    Args:
+        user_id: The authenticated user's ID
+
+    Returns:
+        str: A signed JWT token with expiration metadata
     """
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.TOKEN_EXPIRATION_MINS)
     payload = {
@@ -30,7 +36,17 @@ def create_jwt_token(user_id: int) -> str:
 
 def decode_token(token: str, ignore_exp: bool = False) -> int:
     """
-    Decode a JWT token and return user_id.
+    Decodes a JWT token and returns the embedded user ID.
+
+    Args:
+        token: The JWT string to decode
+        ignore_exp: Whether to ignore token expiration validation
+
+    Returns:
+        int: The authenticated user ID
+
+    Raises:
+        ValueError: If the token is invalid or missing its subject claim
     """
     try:
         # If ignore_exp=True, then ignore the expiration date
@@ -47,7 +63,16 @@ def decode_token(token: str, ignore_exp: bool = False) -> int:
 
 async def verify_user_token(request: Request) -> int:
     """
-    Extract JWT from Authorization header (Bearer token).
+    Validates the bearer token in the Authorization header.
+
+    Args:
+        request: The FastAPI request containing the authorization headers
+
+    Returns:
+        int: The authenticated user ID
+
+    Raises:
+        HTTPException: If the token is missing, malformed, or invalid
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header:
@@ -68,7 +93,13 @@ async def verify_user_token(request: Request) -> int:
 
 async def get_current_user_optional(request: Request) -> int | None:
     """
-    Optional: extract JWT from Authorization header.
+    Attempts to read the current user ID from a bearer token without raising on failure.
+
+    Args:
+        request: The FastAPI request containing the authorization headers
+
+    Returns:
+        int | None: The user ID if the token is valid, otherwise None
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header:
@@ -84,6 +115,19 @@ async def get_current_user_optional(request: Request) -> int | None:
         return None
 
 async def authenticate_user(email: str, password: str) -> int | None:
+    """
+    Authenticates a user with email and password credentials.
+
+    Args:
+        email: The user's email address
+        password: The plain-text password supplied for validation
+
+    Returns:
+        int | None: The authenticated user ID if the credentials are valid, otherwise None
+
+    Raises:
+        ValueError: If the user account is not found
+    """
     # Search user by its email
     user = await search_user_by_email(email)
 

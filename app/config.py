@@ -1,5 +1,5 @@
 """
-Enviroment configuration for TicketPlus + templates path definition.
+Enviroment configuration for Booking Engine + templates path definition.
 """
 
 from typing import Literal

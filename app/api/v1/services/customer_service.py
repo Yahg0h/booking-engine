@@ -12,6 +12,19 @@ from app.database import engine
 
 # DATABASE OPERATIONS
 async def create_customer(organization_id: int, name: str, email: str | None, phone: str | None, is_active: bool) -> int | None:
+    """
+    Creates a customer record for an organization.
+
+    Args:
+        organization_id: The organization that owns the customer
+        name: The customer's full name
+        email: The customer's email address (optional)
+        phone: The customer's phone number (optional)
+        is_active: Whether the customer should be active immediately
+
+    Returns:
+        int | None: The created customer ID, or None if no record was created
+    """
     async with engine.begin() as conn:
         create_query = """
         INSERT INTO customers (organization_id, name, email, phone, is_active)
@@ -31,6 +44,15 @@ async def create_customer(organization_id: int, name: str, email: str | None, ph
     return recent_customer # id
 
 async def search_customer_by_id(customer_id: int) -> dict | None:
+    """
+    Retrieves a customer by their unique ID.
+
+    Args:
+        customer_id: The customer ID to fetch
+
+    Returns:
+        dict | None: The customer record as a dictionary, or None if it does not exist
+    """
     async with engine.connect() as conn:
         query = await conn.execute(text("SELECT * FROM customers WHERE id = :id"), {"id": customer_id})
         results = query.mappings().one_or_none()
@@ -43,6 +65,19 @@ async def list_customers_filtered(organization_id: int,
                                   last_appointment_at: datetime | None,
                                   is_active: bool = True
 ) -> list[dict] | None:
+    """
+    Lists customers using a set of optional filters.
+
+    Args:
+        organization_id: The organization ID filter
+        email: Email filter (optional)
+        phone: Phone filter (optional)
+        last_appointment_at: Last appointment date filter (optional)
+        is_active: Active status filter
+
+    Returns:
+        list[dict] | None: Matching customer records, or None if no results are found
+    """
     async with engine.connect() as conn:
         query = "SELECT * FROM customers WHERE 1=1"
         params = {}
@@ -71,6 +106,19 @@ async def list_customers_filtered(organization_id: int,
     return registered_customers
 
 async def update_customers(id: int, name: str | None, email: str | None, phone: str | None, is_active: bool | None) -> dict | None:
+    """
+    Updates the editable fields of a customer record.
+
+    Args:
+        id: The ID of the customer to update
+        name: The new customer name (optional)
+        email: The new customer email (optional)
+        phone: The new customer phone (optional)
+        is_active: The new active status (optional)
+
+    Returns:
+        dict | None: The updated customer record, or None if no fields were changed
+    """
     async with engine.begin() as conn:
         # Build dyanmic query where only the fields chosen are updated
         updates = []
@@ -105,6 +153,16 @@ async def update_customers(id: int, name: str | None, email: str | None, phone: 
     return updated_customer
 
 async def change_customer_is_active(id: int, is_active: bool) -> bool | None:
+    """
+    Toggles the active status of a customer.
+
+    Args:
+        id: The customer ID to update
+        is_active: The desired active status
+
+    Returns:
+        bool | None: True when the update succeeds, otherwise None
+    """
     async with engine.begin() as conn:
         update_query = """
         UPDATE customers SET is_active = :is_active WHERE id = :id
@@ -114,6 +172,16 @@ async def change_customer_is_active(id: int, is_active: bool) -> bool | None:
     return True
 
 async def update_customer_last_appointment(customer_id: int, last_appointment_at: datetime) -> bool:
+    """
+    Updates the timestamp of the customer's most recent appointment.
+
+    Args:
+        customer_id: The customer whose last appointment timestamp will be updated
+        last_appointment_at: The timestamp to store
+
+    Returns:
+        bool: True when the timestamp update is successful
+    """
     async with engine.begin() as conn:
         update_query = """
         UPDATE customers SET last_appointment_at = :last_appointment_at WHERE id = :id
@@ -125,7 +193,15 @@ async def update_customer_last_appointment(customer_id: int, last_appointment_at
 # Access verification function
 async def check_customer_access(user_id: int, organization_id: int, allow_staff: bool = True):
     """
-    allow_staff: if True, allows OWNER + STAFF; if False, only OWNER + ROOT
+    Validates whether a user can access customer records for a specific organization.
+
+    Args:
+        user_id: The ID of the user being validated
+        organization_id: The organization the user is trying to access
+        allow_staff: If True, staff members may access the records when they belong to the same organization, othwerwise OWNER and ROOT only
+
+    Returns:
+        bool: True when the user has access, otherwise False
     """
     is_owner = await search_user_by_id(user_id)
     is_professional = await search_professional_by_user_id(user_id)

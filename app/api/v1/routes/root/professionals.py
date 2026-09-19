@@ -1,3 +1,6 @@
+"""
+Routes for root-level professional administration.
+"""
 import logging
 
 logger = logging.getLogger(__name__)
@@ -47,6 +50,20 @@ router = APIRouter(prefix="/v1/root")
 # CREATE professional
 @router.post("/professionals", status_code=201)
 async def create_professional_route(request: Request, professional: ProfessionalCreate, user_id: int = Depends(verify_user_token)):
+    """
+    Creates a new professional for the root administrator.
+
+    Args:
+        request: The FastAPI request object
+        professional: The professional creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the professional was created
+
+    Raises:
+        HTTPException: If the current user is not authorized to access the resource
+    """
     # Check if the current user is a OWNER of the selected professional organization or root; If the conditions fail, return 403
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -101,6 +118,20 @@ async def create_professional_route(request: Request, professional: Professional
 # READ all professionals in a organization
 @router.get("/professionals", status_code=200)
 async def get_professionals(organization_id: int, is_active: bool = True, user_id: int = Depends(verify_user_token)):
+    """
+    Lists all professionals in an organization.
+
+    Args:
+        organization_id: The ID of the organization
+        is_active: The status filter
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of registered professionals
+
+    Raises:
+        HTTPException: If the current user is not authorized to access the resource
+    """
     # Check the current user's access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -114,6 +145,19 @@ async def get_professionals(organization_id: int, is_active: bool = True, user_i
 # READ all professionals registered across all registered organizations
 @router.get("/professionals/all", status_code=200)
 async def get_all_professionals(is_active: bool = True, user_id: int = Depends(verify_user_token)):
+    """
+    Lists all professionals registered across all organizations.
+
+    Args:
+        is_active: The status filter
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of all registered professionals
+
+    Raises:
+        HTTPException: If the current user is not authorized to access the resource
+    """
     # Check current user's access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
@@ -127,6 +171,19 @@ async def get_all_professionals(is_active: bool = True, user_id: int = Depends(v
 # READ information of a specific professional (root)
 @router.get("/professionals/{id}", status_code=200)
 async def get_professional(id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves information about a specific professional by ID.
+
+    Args:
+        id: The ID of the professional
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The professional information
+
+    Raises:
+        HTTPException: If the professional is not found or if the current user is not authorized to access it
+    """
     # Check if the professional exists
     professional = await search_professional_by_id(id)
 
@@ -144,6 +201,21 @@ async def get_professional(id: int, user_id: int = Depends(verify_user_token)):
 # UPDATE a professional's information
 @router.patch("/professionals/{id}", status_code=200)
 async def update_professional_route(request: Request, id: int, professional: ProfessionalUpdate, user_id: int = Depends(verify_user_token)):
+    """
+    Updates the information of an existing professional.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the professional
+        professional: The professional update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated professional information
+
+    Raises:
+        HTTPException: If the professional is not found or if the current user is not authorized to access it
+    """
     # Get the professional's info
     professional_db = await search_professional_by_id(id)
 
@@ -202,6 +274,20 @@ async def update_professional_route(request: Request, id: int, professional: Pro
 # DELETE a professional (deactivated)
 @router.delete("/professionals/{id}", status_code=200)
 async def delete_professional(request: Request, id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Deactivates an existing professional.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the professional
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the professional was deactivated
+
+    Raises:
+        HTTPException: If the professional is not found or if the current user is not authorized to access it
+    """
     # Get the professional's info
     professional = await search_professional_by_id(id)
 
@@ -255,10 +341,27 @@ async def delete_professional(request: Request, id: int, user_id: int = Depends(
         }
         return success_dict
 
-# WORKING HOURS Related routes
+# ==========================================
+# WORKING HOUR RELATED ROUTES
+# ==========================================
 # CREATE a professionals working hours
 @router.post("/professionals/{id}/working-hours")
 async def create_working_hour(request: Request, id: int, workinghours: WorkingHoursCreate, user_id: int = Depends(verify_user_token)):
+    """
+    Creates working hours for a professional.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the professional
+        workinghours: The working hours creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the working hours were created
+
+    Raises:
+        HTTPException: If the professional is not found, if the times are invalid, if a conflict exists, or if the current user is not authorized to access the resource
+    """
     # Get the professional's info and their organization_id
     professional = await search_professional_by_id(id)
     organization = await search_organization_by_id(professional["organization_id"])
@@ -346,6 +449,20 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
 # READ all working hours of a professional (root)
 @router.get("/professionals/{professional_id}/working-hours", status_code=200)
 async def get_working_hours_by_professional(professional_id: int, is_active: bool = True, user_id: int = Depends(verify_user_token)):
+    """
+    Lists all working hours for a specific professional.
+
+    Args:
+        professional_id: The ID of the professional
+        is_active: The status filter
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of registered working hours
+
+    Raises:
+        HTTPException: If the professional is not found or if the current user is not authorized to access it
+    """
     # Get the professional's info
     is_exist = await search_professional_by_id(professional_id)
 
@@ -366,6 +483,22 @@ async def get_working_hours_by_professional(professional_id: int, is_active: boo
 # UPDATE a existing working hour
 @router.patch("/professionals/{professional_id}/working-hours/{id}", status_code=200)
 async def update_working_hour(request: Request, professional_id: int, id: int, workinghours: WorkingHoursUpdate, user_id: int = Depends(verify_user_token)):
+    """
+    Updates the information of a working hour.
+
+    Args:
+        request: The FastAPI request object
+        professional_id: The ID of the professional
+        id: The ID of the working hour
+        workinghours: The working hours update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated working hour information
+
+    Raises:
+        HTTPException: If the professional is not found, if the times are invalid, if a conflict exists, or if the current user is not authorized to access the resource
+    """
     # Get the professional's info and their organization_id
     professional = await search_professional_by_id(professional_id)
     organization = await search_organization_by_id(professional["organization_id"])
@@ -448,10 +581,27 @@ async def update_working_hour(request: Request, professional_id: int, id: int, w
     # Return the updated working hour info
     return updated_wk
 
-# BLACKOUTS related routes
+# ==========================================
+# BLACKOUT RELATED ROUTES
+# ==========================================
 # CREATE a blackout (root)
 @router.post("/professionals/{id}/blackouts", status_code=201)
 async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, user_id: int = Depends(verify_user_token)):
+    """
+    Creates a blackout for a professional.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the professional
+        blackout: The blackout creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the blackout was created
+
+    Raises:
+        HTTPException: If the professional is not found, if the blackout dates are invalid, or if the current user is not authorized to access the resource
+    """
     # Verify if the professional exists
     professional = await search_professional_by_id(id)
 
@@ -521,6 +671,19 @@ async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, u
 # READ all blackouts of a professional
 @router.get("/professionals/{id}/blackouts", status_code=200)
 async def get_blackouts_by_professional(id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Lists all blackouts for a specific professional.
+
+    Args:
+        id: The ID of the professional
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of registered blackouts
+
+    Raises:
+        HTTPException: If the professional is not found or if the current user is not authorized to access it
+    """
     # Get the professional's info
     professional = await search_professional_by_id(id)
 
@@ -541,6 +704,19 @@ async def get_blackouts_by_professional(id: int, user_id: int = Depends(verify_u
 # READ a blackout of id 'id'
 @router.get("/professionals/blackouts/{id}", status_code=200)
 async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves information about a specific blackout.
+
+    Args:
+        id: The ID of the blackout
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The blackout information
+
+    Raises:
+        HTTPException: If the blackout is not found or if the current user is not authorized to access it
+    """
     # Get the blackout info
     blackout = await search_blackout_by_id(id)
 
@@ -555,10 +731,27 @@ async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
     # Else, return the blackout
     return blackout
 
+# ==========================================
 # PROFESSIONAL-PROCEDURE RELATIONS ROUTES
+# ==========================================
 # CREATE professional-procedure relations
 @router.post("/professionals/{id}/procedures", status_code=201)
 async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedureCreate, user_id: int = Depends(verify_user_token)):
+    """
+    Creates a link between a professional and a procedure.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the professional
+        pp: The professional-procedure creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the link was created
+
+    Raises:
+        HTTPException: If the professional is not found or if the current user is not authorized to access the resource
+    """
     # Get the professional's info
     professional = await search_professional_by_id(id)
 
@@ -618,6 +811,19 @@ async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedur
 # READ all procedures offered by a professional (root)
 @router.get("/professionals/{id}/procedures", status_code=200)
 async def get_procedures_by_professionals(id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Lists all procedures offered by a specific professional.
+
+    Args:
+        id: The ID of the professional
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of procedures offered by the professional
+
+    Raises:
+        HTTPException: If the professional is not found or if the current user is not authorized to access it
+    """
     # Check if professional exists
     professional_exists = await search_professional_by_id(id)
     
@@ -640,6 +846,22 @@ async def get_procedures_by_professionals(id: int, user_id: int = Depends(verify
 # DELETE a professional-procedure link (deactivate)
 @router.delete("/professionals/{id}/procedures/{procedure_id}", status_code=200)
 async def delete_professional_procedure(request: Request, id: int, procedure_id: int, organization_id: int,user_id: int = Depends(verify_user_token)):
+    """
+    Deactivates a link between a professional and a procedure.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the professional
+        procedure_id: The ID of the procedure
+        organization_id: The ID of the organization
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the link was deactivated
+
+    Raises:
+        HTTPException: If the professional is not found or if the current user is not authorized to access the resource
+    """
     # Get the professional's info
     professional = await search_professional_by_id(id)
 

@@ -1,3 +1,6 @@
+"""
+Routes for managing customers.
+"""
 import logging
 
 from app.logging_config import sanitize_for_logging
@@ -25,6 +28,20 @@ router = APIRouter(prefix="/v1")
 
 @router.post("/customers", status_code=201)
 async def create_customers(request: Request, customer: CustomerCreate, user_id: int = Depends(verify_user_token)):
+    """
+    Creates a new customer.
+
+    Args:
+        request: The FastAPI request object
+        customer: The customer creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message with the created customer ID and Organization ID
+
+    Raises:
+        HTTPException: If access is denied
+    """
     # Check access (owner + staff)
     if not await check_customer_access(user_id, customer.organization_id, allow_staff=True):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -81,6 +98,23 @@ async def list_customers(organization_id: int,
                          last_appointment_at: datetime | None = None,
                          is_active: bool = True,
                          user_id: int = Depends(verify_user_token)):
+    """
+    Lists all registered customers based on the provided filters.
+
+    Args:
+        organization_id: The ID of the organization
+        email: The email filter (optional)
+        phone: The phone filter (optional)
+        last_appointment_at: The last appointment date filter (optional)
+        is_active: The status filter
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of customers matching the filters
+
+    Raises:
+        HTTPException: If access is denied
+    """
     # Check access (root + owner + staff)
     if not await check_customer_access(user_id, organization_id, allow_staff=True):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information")
@@ -97,6 +131,19 @@ async def list_customers(organization_id: int,
 
 @router.get("/customers/{id}", status_code=200)
 async def get_customer(id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves information about a specific customer by ID.
+
+    Args:
+        id: The ID of the customer
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The customer information
+
+    Raises:
+        HTTPException: If the customer is not found or if access is denied
+    """
     # Check if the customer exists
     customer = await search_customer_by_id(id)
 
@@ -114,6 +161,21 @@ async def get_customer(id: int, user_id: int = Depends(verify_user_token)):
 
 @router.patch("/customers/{id}", status_code=200)
 async def update_customer(request: Request, id: int, customer_update: CustomerUpdate, user_id: int = Depends(verify_user_token)):
+    """
+    Updates the information of an existing customer.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the customer
+        customer_update: The customer update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated customer information
+
+    Raises:
+        HTTPException: If the customer is not found or if access is denied
+    """
     # Check if the customer exists
     customer = await search_customer_by_id(id)
     
@@ -171,6 +233,20 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
 
 @router.delete("/customers/{id}", status_code=200)
 async def delete_customer(request: Request, id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Deactivates an existing customer.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the customer
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message
+
+    Raises:
+        HTTPException: If the customer is not found or if access is denied
+    """
     # Check if the customer exists
     customer = await search_customer_by_id(id)
 

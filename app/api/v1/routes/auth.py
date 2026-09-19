@@ -1,3 +1,6 @@
+"""
+Routes for managing authentication and user access.
+"""
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,6 +28,20 @@ router = APIRouter(prefix="/v1")
 # Register Route
 @router.post("/register", status_code=201)
 async def register(request: Request, user: UserCreate, user_id: int | None = Depends(get_current_user_optional)):
+    """
+    Registers a new user account with the appropriate role permissions.
+
+    Args:
+        request: The FastAPI request object
+        user: The user creation schema
+        user_id: The ID of the authenticated user (optional)
+
+    Returns:
+        dict: A success message confirming the new user account was created
+
+    Raises:
+        HTTPException: If a root account already exists, if the user is not allowed to create the requested role, if the email is already registered, or if the current user lacks the required permissions
+    """
     # Check if anyone is trying to create a 2nd ROOT account
     if user.role == 'ROOT':
         root_exists = await list_users_by_role("ROOT")
@@ -101,6 +118,19 @@ async def register(request: Request, user: UserCreate, user_id: int | None = Dep
 # Login Route
 @router.post("/login", status_code=200)
 async def login(request: Request, user: UserLogin):
+    """
+    Authenticates a user and returns a JWT token.
+
+    Args:
+        request: The FastAPI request object
+        user: The user login schema
+
+    Returns:
+        dict: An access token and token type for authenticated requests
+
+    Raises:
+        HTTPException: If the user does not exist or the password is invalid
+    """
     # Search if the user exists
     try:
         is_registered = await authenticate_user(user.email, user.password)

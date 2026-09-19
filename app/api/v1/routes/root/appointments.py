@@ -1,3 +1,6 @@
+"""
+Routes for root-level appointment administration.
+"""
 import logging
 
 logger = logging.getLogger(__name__)
@@ -29,6 +32,20 @@ router = APIRouter(prefix="/v1/root")
 
 @router.post("/appointments", status_code=201)
 async def create_appointment_route(request: Request, appointment: AppointmentCreate, user_id: int = Depends(verify_user_token)):
+    """
+    Creates a new appointment for the root administrator.
+
+    Args:
+        request: The FastAPI request object
+        appointment: The appointment creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the appointment was created
+
+    Raises:
+        HTTPException: If the organization, procedure, or professional is not found, if the appointment date is invalid, if access is denied, or if a conflict occurs during creation
+    """
     # Check if the org, customer, professional, procedure exists
     organization = await search_organization_by_id(appointment.organization_id)
     procedure = await search_procedure_by_id(appointment.procedure_id)
@@ -115,6 +132,25 @@ async def list_appointments(organization_id: int,
                             end_at: datetime | None = None,
                             status: str | None = None,
                             user_id: int = Depends(verify_user_token)):
+    """
+    Lists appointments using the provided filters for the root administrator.
+
+    Args:
+        organization_id: The ID of the organization
+        customer_id: The customer ID filter (optional)
+        professional_id: The professional ID filter (optional)
+        procedure_id: The procedure ID filter (optional)
+        start_at: The start date and time filter (optional)
+        end_at: The end date and time filter (optional)
+        status: The appointment status filter (optional)
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of appointments matching the filters
+
+    Raises:
+        HTTPException: If the current user is not authorized to access the resource
+    """
     # Check access
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You do not have permission to access this resource.")
@@ -127,6 +163,19 @@ async def list_appointments(organization_id: int,
 
 @router.get("/appointments/{id}", status_code=200)
 async def get_appointment(id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves information about a specific appointment by ID.
+
+    Args:
+        id: The ID of the appointment
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The appointment information
+
+    Raises:
+        HTTPException: If the appointment is not found or if the current user is not authorized to access it
+    """
     # Check if the appointment exists
     appointment = await search_appointment_by_id(id)
 
@@ -142,6 +191,21 @@ async def get_appointment(id: int, user_id: int = Depends(verify_user_token)):
 
 @router.patch("/appointments/{id}", status_code=200)
 async def update_appointment(request: Request, id: int, appointment: AppointmentUpdate, user_id: int = Depends(verify_user_token)):
+    """
+    Updates the information of an existing appointment.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the appointment
+        appointment: The appointment update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated appointment information
+
+    Raises:
+        HTTPException: If the appointment is not found, if the organization, procedure, or professional is missing, if the date is invalid, if access is denied, or if a conflict occurs during the update
+    """
     # Check if the appointment exists
     is_exist = await search_appointment_by_id(id)
 
@@ -225,6 +289,20 @@ async def update_appointment(request: Request, id: int, appointment: Appointment
 
 @router.delete("/appointments/{id}", status_code=200)
 async def cancel_appointment(request: Request, id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Cancels an existing appointment.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the appointment
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the appointment was canceled
+
+    Raises:
+        HTTPException: If the appointment is not found, if the related resources are missing, or if the current user is not authorized to access the resource
+    """
     # Check if the appointment exists
     appointment = await search_appointment_by_id(id)
 

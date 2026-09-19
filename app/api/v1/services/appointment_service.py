@@ -1,3 +1,7 @@
+"""
+Services for appointment records and business rules.
+"""
+
 from datetime import datetime, timedelta
 
 from sqlalchemy import text
@@ -12,6 +16,25 @@ from app.database import engine
 # DATABASE OPERATIONS
 async def create_appointment(organization_id: int, customer_id: int, professional_id: int, procedure_id: int,
                              start_at: datetime, status: str, end_at: datetime | None = None, notes: str | None = None) -> int | None:
+    """
+    Creates a new appointment after validating scheduling availability.
+
+    Args:
+        organization_id: The organization that owns the appointment
+        customer_id: The ID of the customer booking the appointment
+        professional_id: The ID of the professional providing the service
+        procedure_id: The ID of the selected procedure
+        start_at: The appointment start date and time
+        status: The appointment status value to persist
+        end_at: The optional appointment end date and time
+        notes: Additional notes for the appointment
+
+    Returns:
+        int | None: The newly created appointment ID, or None if no appointment was created
+
+    Raises:
+        ValueError: If the requested time slot is no longer available
+    """
     from app.api.v1.services.availability_service import availability_service
     async with engine.begin() as conn:
         # Acquire distributed lock to prevent race condition (two requests for a one slot)
@@ -55,6 +78,15 @@ async def create_appointment(organization_id: int, customer_id: int, professiona
             release_lock(lock_key)
 
 async def search_appointment_by_id(appointment_id: int) -> dict | None:
+    """
+    Retrieves a single appointment by ID.
+
+    Args:
+        appointment_id: The ID of the appointment to fetch
+
+    Returns:
+        dict | None: The appointment record as a dictionary, or None if it does not exist
+    """
     async with engine.connect() as conn:
         query = await conn.execute(text("SELECT * FROM appointments WHERE id = :id"), {"id": appointment_id})
         appointment = query.mappings().one_or_none()
@@ -69,6 +101,21 @@ async def list_appointments_filtered(organization_id: int | None,
                                     end_at: datetime | None,
                                     status: str | None,
 ) -> list[dict] | None:
+    """
+    Lists appointments using dynamic filters.
+
+    Args:
+        organization_id: The organization ID filter (optional)
+        customer_id: The customer ID filter (optional)
+        professional_id: The professional ID filter (optional)
+        procedure_id: The procedure ID filter (optional)
+        start_at: The appointment start time filter (optional)
+        end_at: The appointment end time filter (optional)
+        status: The status filter (optional)
+
+    Returns:
+        list[dict] | None: A list of matching appointment records, or None if no results are found
+    """
     async with engine.connect() as conn:
         query = "SELECT * FROM appointments WHERE 1=1"
         params = {}
@@ -103,6 +150,18 @@ async def list_appointments_filtered(organization_id: int | None,
     return registered_appointments
 
 async def list_appointments_by_time_frame(organization_id: int, professional_id: int, start_at: datetime, end_at: datetime) -> list[dict] | None:
+    """
+    Lists appointments that overlap a time frame for a specific professional.
+
+    Args:
+        organization_id: The organization that owns the appointments
+        professional_id: The professional whose appointments are checked
+        start_at: The lower bound of the requested time interval
+        end_at: The upper bound of the requested time interval
+
+    Returns:
+        list[dict] | None: The overlapping appointment records, or None if no records are found
+    """
     async with engine.connect() as conn:
         search_query = """
             SELECT id, start_at, end_at
@@ -123,6 +182,26 @@ async def list_appointments_by_time_frame(organization_id: int, professional_id:
 async def update_appointments(id: int, organization_id: int, customer_id: int,
                                professional_id: int, procedure_id: int, start_at: datetime | None,
                                end_at: datetime | None, status: str | None, notes: str | None) -> dict | None:
+    """
+    Updates an appointment while validating the selected time slot.
+
+    Args:
+        id: The ID of the appointment to update
+        organization_id: The organization owning the appointment
+        customer_id: The customer ID associated with the appointment
+        professional_id: The professional assigned to the appointment
+        procedure_id: The procedure selected for the appointment
+        start_at: The new appointment start time (optional)
+        end_at: The new appointment end time (optional)
+        status: The new appointment status (optional)
+        notes: Updated appointment notes (optional)
+
+    Returns:
+        dict | None: The updated appointment record, or None if no fields were changed
+
+    Raises:
+        ValueError: If the updated time is unavailable for booking
+    """
     from app.api.v1.services.availability_service import availability_service
     async with engine.begin() as conn:
         # Build dyanmic query where only the fields chosen are updated
@@ -168,6 +247,15 @@ async def update_appointments(id: int, organization_id: int, customer_id: int,
     return updated_app
 
 async def appointment_completed(appointment_id: int) -> bool:
+    """
+    Marks an appointment as completed.
+
+    Args:
+        appointment_id: The ID of the appointment to update
+
+    Returns:
+        bool: True when the update is successful
+    """
     async with engine.begin() as conn:
         status = 'COMPLETED'
         await conn.execute(text("UPDATE appointments SET status = :status WHERE id = :id"), {"status": status, "id": appointment_id})
@@ -175,6 +263,15 @@ async def appointment_completed(appointment_id: int) -> bool:
     return True
 
 async def appointment_canceled(appointment_id: int) -> bool:
+    """
+    Marks an appointment as canceled.
+
+    Args:
+        appointment_id: The ID of the appointment to cancel
+
+    Returns:
+        bool: True when the update is successful
+    """
     async with engine.begin() as conn:
         status = 'CANCELLED'
         await conn.execute(text("UPDATE appointments SET status = :status WHERE id = :id"), {"status": status, "id": appointment_id})
@@ -184,7 +281,15 @@ async def appointment_canceled(appointment_id: int) -> bool:
 # Access verification function
 async def check_appointment_access(user_id: int, organization_id: int):
     """
-    APPOINTMENTS: OWNER + STAFF + ROOT can access it
+    Validates whether a user can access appointment records for an organization.
+    OWNER, STAFF and ROOT can access it.
+
+    Args:
+        user_id: The ID of the user being checked
+        organization_id: The organization context to validate against
+
+    Returns:
+        bool: True if the user has access, otherwise False
     """
     is_owner = await search_user_by_id(user_id)
     is_professional = await search_professional_by_user_id(user_id)

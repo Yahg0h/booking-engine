@@ -1,3 +1,6 @@
+"""
+Routes for managing user accounts.
+"""
 import logging
 
 from app.logging_config import sanitize_for_logging
@@ -31,6 +34,20 @@ router = APIRouter(prefix="/v1")
 # CREATE a user staff account
 @router.post("/users", status_code=201)
 async def create_staff(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
+    """
+    Creates a new staff user account.
+
+    Args:
+        request: The FastAPI request object
+        user: The user creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the staff account was created
+
+    Raises:
+        HTTPException: If the current user does not have access to create the staff account, if the email is already registered, or if access is denied
+    """
     # Check access (owner or root only)
     if not await check_user_access(user_id, user.organization_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -94,6 +111,20 @@ async def create_staff(request: Request, user: UserCreate, user_id: int | None =
 # CREATE a user owner account (root-account only)
 @router.post("/users/owners", status_code=201)
 async def create_owner(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
+    """
+    Creates a new owner user account.
+
+    Args:
+        request: The FastAPI request object
+        user: The user creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the owner account was created
+
+    Raises:
+        HTTPException: If the current user is not a root administrator, if the email is already registered, or if access is denied
+    """
     # Check if the current user is a ROOT account
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -157,6 +188,20 @@ async def create_owner(request: Request, user: UserCreate, user_id: int | None =
 # READ users information (all users for ROOT, all users in organization for OWNER)
 @router.get("/users", status_code=200)
 async def get_users(role: str | None = None, is_active: bool | None = None, user_id: int | None = Depends(verify_user_token)):
+    """
+    Lists users based on the provided filters.
+
+    Args:
+        role: The role filter (optional)
+        is_active: The status filter (optional)
+        user_id: The ID of the authenticated user
+
+    Returns:
+        list: A list of users matching the provided filters
+
+    Raises:
+        HTTPException: If the current user is not allowed to list the requested users or if the filter is invalid
+    """
     # Get the current user's role and organization
     current_user = await search_user_by_id(user_id)
 
@@ -172,6 +217,19 @@ async def get_users(role: str | None = None, is_active: bool | None = None, user
 # Read a specific user information
 @router.get("/users/{id}", status_code=200)
 async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
+    """
+    Retrieves information about a specific user by ID.
+
+    Args:
+        id: The ID of the user
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The user information
+
+    Raises:
+        HTTPException: If the user is not found or if the current user does not have access to view it
+    """
     # Get the selected users information
     user_info = await search_user_by_id(id)
 
@@ -188,6 +246,21 @@ async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
 # UPDATE a user's information (User-only)
 @router.patch("/users/{id}", status_code=200)
 async def update_user_info(request: Request, id: int, user: UserUpdateOwn, user_id: int | None = Depends(verify_user_token)):
+    """
+    Updates the profile information of the authenticated user.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the user being updated
+        user: The user profile update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated user information
+
+    Raises:
+        HTTPException: If the user is not allowed to update the account, if the current password is invalid, or if the update operation fails
+    """
     # Check if the current user's is the user of id 'id'; if it isn't, return 403
     if id != user_id:
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
@@ -247,6 +320,21 @@ async def update_user_info(request: Request, id: int, user: UserUpdateOwn, user_
 # UPDATE a user's information (Admin - root and owner Only)
 @router.patch("/users/admin/update/{id}", status_code=200)
 async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin, user_id: int | None = Depends(verify_user_token)):
+    """
+    Updates a user's information from an administrator perspective.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the user being updated
+        user: The admin user update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated user information
+
+    Raises:
+        HTTPException: If the user is not found, if the current user is not authorized to administrate the account, or if the update operation fails
+    """
     # Get the selected user's organization id
     user_info = await search_user_by_id(id)
 
@@ -311,6 +399,20 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
 
 @router.delete("/users/{id}", status_code=200)
 async def delete_user(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
+    """
+    Deactivates an existing user account.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the user to deactivate
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the user account was deactivated
+
+    Raises:
+        HTTPException: If the user is not found or if the current user is not authorized to deactivate the account
+    """
     # Get the selected user's organization id
     user_info = await search_user_by_id(id)
 

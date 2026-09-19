@@ -1,7 +1,6 @@
-from app.config import settings
-from app.logging_config import setup_logging
-
-setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)
+"""
+Application entry point to initialize the FastAPI app, configure logging, and register all API routers.
+"""
 
 from datetime import datetime, timezone
 
@@ -21,7 +20,12 @@ from app.api.v1.routes.root.procedures import router as root_procedures
 from app.api.v1.routes.root.professionals import router as root_professionals
 from app.api.v1.routes.root.users import router as root_users
 from app.api.v1.routes.users import router as users_router
+from app.config import settings
 from app.database import check_database_connection
+from app.logging_config import setup_logging
+
+# Trigger logging configuration before app initialization
+setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)
 
 app = FastAPI(
     title="Booking Engine",
@@ -73,7 +77,7 @@ app.include_router(availability_router)
 
 app.include_router(appointment_service)
 
-# Root routes
+# ==== Include all v1 root routes ====
 app.include_router(root_users)
 app.include_router(root_organizations)
 app.include_router(root_professionals)

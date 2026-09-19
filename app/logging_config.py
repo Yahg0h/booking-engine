@@ -1,3 +1,6 @@
+"""
+Configure system-wide structured logging and provide utilities for masking sensitive PII.
+"""
 import logging
 import sys
 from typing import Literal
