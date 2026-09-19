@@ -5,6 +5,8 @@ Application entry point to initialize the FastAPI app, configure logging, and re
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
+from fastapi.security import HTTPBearer
 
 from app.api.v1.routes.appointments import router as appointment_service
 from app.api.v1.routes.auth import router as auth_router
@@ -27,6 +29,7 @@ from app.logging_config import setup_logging
 # Trigger logging configuration before app initialization
 setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)
 
+# Initialize app
 app = FastAPI(
     title="Booking Engine",
     description="A REST scheduling API designed around dynamic availability and concurrency.",
@@ -34,6 +37,37 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
+# Initialize HTTP Bearer
+security = HTTPBearer()
+
+# Customize OpenAPI schema to include Bearer token
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title="Booking Engine API",
+        version="1.0.0",
+        description="Multi-tenant appointment booking REST API",
+        routes=app.routes,
+    )
+    
+    openapi_schema["components"]["securitySchemes"] = {
+        "HTTPBearer": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    }
+    
+    openapi_schema["security"] = [{"HTTPBearer": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
+# ==== ROUTES ====
 @app.get("/")
 async def root():
     return {
