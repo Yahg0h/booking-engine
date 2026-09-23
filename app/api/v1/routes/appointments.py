@@ -22,6 +22,7 @@ from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.customer_service import update_customer_last_appointment
 from app.api.v1.services.organization_service import search_organization_by_id
+from app.api.v1.services.organization_settings_service import get_organization_settings
 from app.api.v1.services.procedure_service import search_procedure_by_id
 from app.api.v1.services.professional_service import (
     search_professional_by_id,
@@ -326,6 +327,25 @@ async def cancel_appointment(request: Request, id: int, user_id: int = Depends(v
     # Check access
     if not await check_appointment_access(user_id, organization["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+
+    # Verify whether the cancellation policy is being adhered to
+    settings = await get_organization_settings(appointment["organization_id"])
+
+    if settings is None:
+        raise HTTPException(status_code=409, detail="Organization settings are not configured.")
+
+    now = datetime.now(timezone.utc)
+    appointment_start = appointment["start_at"]
+    if appointment_start.tzinfo is None:
+        appointment_start = appointment_start.replace(tzinfo=timezone.utc)
+
+    time_until_appointment = (appointment_start - now).total_seconds() / 3600
+
+    if time_until_appointment < settings["cancellation_buffer_hours"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Cannot cancel appointment less than {settings['cancellation_buffer_hours']} hours before the scheduled time."
+        )
 
     # Cancel the appointment
     is_canceled = await appointment_canceled(id)

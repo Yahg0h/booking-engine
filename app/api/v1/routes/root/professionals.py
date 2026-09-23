@@ -623,7 +623,7 @@ async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, u
         raise HTTPException(status_code=422, detail="The start or end date for the blackout must be from today onwards.")
 
     # Else, create blackout
-    recent_blackout_id = await create_blackouts(id, blackout.start_at, blackout.end_at, blackout.reason)
+    recent_blackout_id = await create_blackouts(id, blackout.start_at, blackout.end_at, blackout.reason, blackout.status.value)
 
     # Return success message
     if recent_blackout_id:

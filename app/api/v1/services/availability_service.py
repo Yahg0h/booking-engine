@@ -2,10 +2,11 @@
 Service logic for calculating professional availability slots.
 """
 
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from app.api.v1.services.appointment_service import list_appointments_by_time_frame
 from app.api.v1.services.organization_service import search_organization_by_id
+from app.api.v1.services.organization_settings_service import get_organization_settings
 from app.api.v1.services.procedure_service import (
     search_procedure_by_id,
     search_professional_procedure_unique,
@@ -21,12 +22,26 @@ def _timedelta_to_time(td: timedelta) -> time:
     """Convert timedelta (from MySQL TIME column) to time object."""
     if isinstance(td, time):
         return td
-    return (datetime.min + td).time()
+    return (datetime.min.replace(tzinfo=timezone.utc) + td).time()
 
 
 async def availability_service(organization_id: int, professional_id: int, procedure_id: int, date: date) -> list[datetime]:
     # Get the organization's opening and closing times
     organization = await search_organization_by_id(organization_id)
+
+    settings = await get_organization_settings(organization_id)
+
+    if settings is None:
+        settings = {"operating_weekdays": [1, 2, 3, 4, 5, 6, 7]}
+
+    # Get the selected date's weekday and convert it to the Booking Engine date convention
+    # e.g Sunday: weekday() = 6 → (6 + 2) % 7 = 8 % 7 = 1 (Booking Engine date)
+    day = (date.weekday() + 2) % 7 or 7
+
+    # Verify if the day chosen is in the organization operating_weekdays
+    if day not in settings["operating_weekdays"]:
+        raise ValueError("Organization doesn't operate on this day.")
+
     # Get the professionals buffer time and if he is_active
     professional = await search_professional_by_id(professional_id)
     # Get the procedures duration minutes and if it is_active
@@ -39,7 +54,7 @@ async def availability_service(organization_id: int, professional_id: int, proce
     if not professional_procedure:
         raise ValueError("Professional doesn't offer this procedure.")
 
-    # Get the selected date's weekday (e.g. is it sunday? monday?) and sum + 1
+    # Working hours use Monday=1 through Sunday=7.
     day = date.weekday() + 1
     # Check if the professional is working in the day to be scheduled
     pro_working_hours = await list_active_working_hours_by_professional(professional_id)
@@ -87,6 +102,10 @@ async def availability_service(organization_id: int, professional_id: int, proce
     blackout_intervals = free_intervals.copy()
 
     for blackout in pro_blackouts:
+        # Verify if the blackout was accepted
+        if blackout["status"] != "ACCEPTED":
+            continue
+
         # Check if this blackout overlaps the working period
         if blackout["start_at"] < dt_end and blackout["end_at"] > dt_start:
             blackout_start = blackout["start_at"]
