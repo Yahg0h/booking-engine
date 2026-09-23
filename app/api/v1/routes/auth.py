@@ -21,12 +21,14 @@ from app.api.v1.services.user_service import (
     list_users_by_role,
     search_user_by_email,
 )
+from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1")
 
 # Register Route
 @router.post("/register", status_code=201)
+@limiter.limit("5/minute")
 async def register(request: Request, user: UserCreate, user_id: int | None = Depends(get_current_user_optional)):
     """
     Registers a new user account with the appropriate role permissions.
@@ -117,6 +119,7 @@ async def register(request: Request, user: UserCreate, user_id: int | None = Dep
 
 # Login Route
 @router.post("/login", status_code=200)
+@limiter.limit("5/minute")
 async def login(request: Request, user: UserLogin):
     """
     Authenticates a user and returns a JWT token.

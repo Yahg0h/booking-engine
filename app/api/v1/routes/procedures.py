@@ -22,12 +22,14 @@ from app.api.v1.services.procedure_service import (
     search_procedure_by_id,
     update_procedure,
 )
+from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1")
 
 # CREATE a procedure
 @router.post("/procedures", status_code=201)
+@limiter.limit("30/minute")
 async def create_procedure_route(request: Request, procedure: ProcedureCreate, user_id: int = Depends(verify_user_token)):
     """
     Creates a new procedure.
@@ -95,7 +97,8 @@ async def create_procedure_route(request: Request, procedure: ProcedureCreate, u
 
 # READ all procedures offered by a organization (public route)
 @router.get("/procedures/organization/{id}", status_code=200)
-async def get_procedures_by_organization(id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
+@limiter.limit("30/minute")
+async def get_procedures_by_organization(request: Request, id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
     """
     Lists all procedures offered by an organization.
 
@@ -125,7 +128,8 @@ async def get_procedures_by_organization(id: int, is_active: bool = True, user_i
 
 # READ the information of a procedure (public route)
 @router.get("/procedures/{id}", status_code=200)
-async def get_procedure(id: int, user_id: int = Depends(get_current_user_optional)):
+@limiter.limit("30/minute")
+async def get_procedure(request: Request, id: int, user_id: int = Depends(get_current_user_optional)):
     """
     Retrieves information about a specific procedure by ID.
 
@@ -151,6 +155,7 @@ async def get_procedure(id: int, user_id: int = Depends(get_current_user_optiona
 
 # UPDATE a procedures information
 @router.patch("/procedures/{id}", status_code=200)
+@limiter.limit("30/minute")
 async def update_procedure_route(request: Request, id: int, procedure: ProcedureUpdate, user_id: int = Depends(verify_user_token)):
     """
     Updates the information of an existing procedure.
@@ -225,6 +230,7 @@ async def update_procedure_route(request: Request, id: int, procedure: Procedure
 
 # DELETE a procedures information
 @router.delete("/procedures/{id}", status_code=200)
+@limiter.limit("30/minute")
 async def delete_procedure(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Deactivates an existing procedure.

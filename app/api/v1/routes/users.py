@@ -27,12 +27,14 @@ from app.api.v1.services.user_service import (
     update_own_profile,
     update_user_admin,
 )
+from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1")
 
 # CREATE a user staff account
 @router.post("/users", status_code=201)
+@limiter.limit("10/minute")
 async def create_staff(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
     """
     Creates a new staff user account.
@@ -110,6 +112,7 @@ async def create_staff(request: Request, user: UserCreate, user_id: int | None =
 
 # CREATE a user owner account (root-account only)
 @router.post("/users/owners", status_code=201)
+@limiter.limit("10/minute")
 async def create_owner(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
     """
     Creates a new owner user account.
@@ -187,7 +190,8 @@ async def create_owner(request: Request, user: UserCreate, user_id: int | None =
 
 # READ users information (all users for ROOT, all users in organization for OWNER)
 @router.get("/users", status_code=200)
-async def get_users(role: str | None = None, is_active: bool | None = None, user_id: int | None = Depends(verify_user_token)):
+@limiter.limit("50/minute")
+async def get_users(request: Request, role: str | None = None, is_active: bool | None = None, user_id: int | None = Depends(verify_user_token)):
     """
     Lists users based on the provided filters.
 
@@ -216,7 +220,8 @@ async def get_users(role: str | None = None, is_active: bool | None = None, user
 
 # Read a specific user information
 @router.get("/users/{id}", status_code=200)
-async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
+@limiter.limit("50/minute")
+async def get_user(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
     """
     Retrieves information about a specific user by ID.
 
@@ -245,6 +250,7 @@ async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
 
 # UPDATE a user's information (User-only)
 @router.patch("/users/{id}", status_code=200)
+@limiter.limit("20/minute")
 async def update_user_info(request: Request, id: int, user: UserUpdateOwn, user_id: int | None = Depends(verify_user_token)):
     """
     Updates the profile information of the authenticated user.
@@ -319,6 +325,7 @@ async def update_user_info(request: Request, id: int, user: UserUpdateOwn, user_
 
 # UPDATE a user's information (Admin - root and owner Only)
 @router.patch("/users/admin/update/{id}", status_code=200)
+@limiter.limit("20/minute")
 async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin, user_id: int | None = Depends(verify_user_token)):
     """
     Updates a user's information from an administrator perspective.
@@ -398,6 +405,7 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
     return is_updated
 
 @router.delete("/users/{id}", status_code=200)
+@limiter.limit("20/minute")
 async def delete_user(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
     """
     Deactivates an existing user account.

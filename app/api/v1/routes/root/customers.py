@@ -21,11 +21,13 @@ from app.api.v1.services.customer_service import (
     update_customers,
 )
 from app.api.v1.services.permission_service import is_root
+from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1/root")
 
 @router.post("/customers", status_code=201)
+@limiter.limit("50/minute")
 async def create_customers(request: Request, customer: CustomerCreate, user_id: int = Depends(verify_user_token)):
     """
     Creates a new customer for the root administrator.
@@ -91,7 +93,8 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
         return success_dict
 
 @router.get("/customers", status_code=200)
-async def list_customers(organization_id: int,
+@limiter.limit("200/minute")
+async def list_customers(request: Request, organization_id: int,
                          email: str | None = None,
                          phone: str | None = None,
                          last_appointment_at: datetime | None = None,
@@ -129,7 +132,8 @@ async def list_customers(organization_id: int,
     return registered_customers
 
 @router.get("/customers/{id}", status_code=200)
-async def get_customer(id: int, user_id: int = Depends(verify_user_token)):
+@limiter.limit("200/minute")
+async def get_customer(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Retrieves information about a specific customer by ID.
 
@@ -159,6 +163,7 @@ async def get_customer(id: int, user_id: int = Depends(verify_user_token)):
     return customer
 
 @router.patch("/customers/{id}", status_code=200)
+@limiter.limit("50/minute")
 async def update_customer(request: Request, id: int, customer_update: CustomerUpdate, user_id: int = Depends(verify_user_token)):
     """
     Updates the information of an existing customer.
@@ -231,6 +236,7 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
         return updated_customer
 
 @router.delete("/customers/{id}", status_code=200)
+@limiter.limit("30/minute")
 async def delete_customer(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Deactivates an existing customer.

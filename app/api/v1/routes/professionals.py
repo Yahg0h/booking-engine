@@ -50,12 +50,14 @@ from app.api.v1.services.professional_service import (
     update_working_hours,
 )
 from app.api.v1.services.user_service import search_user_by_id
+from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1")
 
 # CREATE professional
 @router.post("/professionals", status_code=201)
+@limiter.limit("30/minute")
 async def create_professional_route(request: Request, professional: ProfessionalCreate, user_id: int = Depends(verify_user_token)):
     """
     Creates a new professional.
@@ -124,7 +126,8 @@ async def create_professional_route(request: Request, professional: Professional
 
 # READ all professionals in a organization
 @router.get("/professionals", status_code=200)
-async def get_professionals(organization_id: int, is_active: bool = True, user_id: int = Depends(verify_user_token)):
+@limiter.limit("30/minute")
+async def get_professionals(request: Request, organization_id: int, is_active: bool = True, user_id: int = Depends(verify_user_token)):
     """
     Lists all professionals in an organization.
 
@@ -151,7 +154,8 @@ async def get_professionals(organization_id: int, is_active: bool = True, user_i
 
 # READ all professionals registered across all registered organizations (root-only)
 @router.get("/professionals/all", status_code=200)
-async def get_all_professionals(is_active: bool = True, user_id: int = Depends(verify_user_token)):
+@limiter.limit("30/minute")
+async def get_all_professionals(request: Request, is_active: bool = True, user_id: int = Depends(verify_user_token)):
     """
     Lists all professionals registered across all organizations (root-only).
 
@@ -177,7 +181,8 @@ async def get_all_professionals(is_active: bool = True, user_id: int = Depends(v
 
 # READ information of a specific professional (public route)
 @router.get("/professionals/{id}", status_code=200)
-async def get_professional(id: int, user_id: int = Depends(get_current_user_optional)):
+@limiter.limit("30/minute")
+async def get_professional(request: Request, id: int, user_id: int = Depends(get_current_user_optional)):
     """
     Retrieves public information of a specific professional.
 
@@ -210,6 +215,7 @@ async def get_professional(id: int, user_id: int = Depends(get_current_user_opti
 
 # UPDATE a professional's information
 @router.patch("/professionals/{id}", status_code=200)
+@limiter.limit("30/minute")
 async def update_professional_route(request: Request, id: int, professional: ProfessionalUpdate, user_id: int = Depends(verify_user_token)):
     """
     Updates a professional's information.
@@ -283,6 +289,7 @@ async def update_professional_route(request: Request, id: int, professional: Pro
 
 # DELETE a professional (deactivated)
 @router.delete("/professionals/{id}", status_code=200)
+@limiter.limit("30/minute")
 async def delete_professional(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Deactivates a professional.
@@ -356,6 +363,7 @@ async def delete_professional(request: Request, id: int, user_id: int = Depends(
 # ==========================================
 # CREATE a professionals working hours
 @router.post("/professionals/{id}/working-hours")
+@limiter.limit("30/minute")
 async def create_working_hour(request: Request, id: int, workinghours: WorkingHoursCreate, user_id: int = Depends(verify_user_token)):
     """
     Creates working hours for a professional.
@@ -458,7 +466,8 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
 
 # READ all working hours of a professional (public route)
 @router.get("/professionals/{professional_id}/working-hours", status_code=200)
-async def get_working_hours_by_professional(professional_id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
+@limiter.limit("30/minute")
+async def get_working_hours_by_professional(request: Request, professional_id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
     """
     Lists all working hours for a specific professional.
 
@@ -488,6 +497,7 @@ async def get_working_hours_by_professional(professional_id: int, is_active: boo
 
 # UPDATE a existing working hour
 @router.patch("/professionals/{professional_id}/working-hours/{id}", status_code=200)
+@limiter.limit("30/minute")
 async def update_working_hour(request: Request, professional_id: int, id: int, workinghours: WorkingHoursUpdate, user_id: int = Depends(verify_user_token)):
     """
     Updates the information of a working hour.
@@ -591,6 +601,7 @@ async def update_working_hour(request: Request, professional_id: int, id: int, w
 # ==========================================
 # CREATE a blackout (professional-only)
 @router.post("/professionals/{id}/blackouts", status_code=201)
+@limiter.limit("30/minute")
 async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, user_id: int = Depends(verify_user_token)):
     """
     Creates a blackout for a professional.
@@ -675,7 +686,8 @@ async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, u
 
 # READ all blackouts of a professional
 @router.get("/professionals/{id}/blackouts", status_code=200)
-async def get_blackouts_by_professional(id: int, user_id: int = Depends(verify_user_token)):
+@limiter.limit("30/minute")
+async def get_blackouts_by_professional(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Lists all blackouts for a specific professional.
 
@@ -707,7 +719,8 @@ async def get_blackouts_by_professional(id: int, user_id: int = Depends(verify_u
 
 # READ a blackout of id 'id'
 @router.get("/professionals/blackouts/{id}", status_code=200)
-async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
+@limiter.limit("30/minute")
+async def get_blackout(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Retrieves information about a specific blackout.
 
@@ -739,6 +752,7 @@ async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
     return blackout
 
 @router.post("/blackouts/{id}/approve", status_code=200)
+@limiter.limit("30/minute")
 async def approve_blackout_route(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Approves a blackout.
@@ -807,6 +821,7 @@ async def approve_blackout_route(request: Request, id: int, user_id: int = Depen
     return approved_blackout
 
 @router.post("/blackouts/{id}/reject", status_code=200)
+@limiter.limit("30/minute")
 async def reject_blackout_route(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Rejects a blackout.
@@ -879,6 +894,7 @@ async def reject_blackout_route(request: Request, id: int, user_id: int = Depend
 # ==========================================
 # CREATE professional-procedure relations
 @router.post("/professionals/{id}/procedures", status_code=201)
+@limiter.limit("30/minute")
 async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedureCreate, user_id: int = Depends(verify_user_token)):
     """
     Creates a link between a professional and a procedure.
@@ -953,7 +969,8 @@ async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedur
 
 # READ all procedures offered by a professional (public route)
 @router.get("/professionals/{id}/procedures", status_code=200)
-async def get_procedures_by_professionals(id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
+@limiter.limit("30/minute")
+async def get_procedures_by_professionals(request: Request, id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
     """
     Lists all procedures offered by a specific professional.
 
@@ -985,6 +1002,7 @@ async def get_procedures_by_professionals(id: int, is_active: bool = True, user_
 
 # DELETE a professional-procedure link (deactivate)
 @router.delete("/professionals/{id}/procedures/{procedure_id}", status_code=200)
+@limiter.limit("30/minute")
 async def delete_professional_procedure(request: Request, id: int, procedure_id: int, organization_id: int,user_id: int = Depends(verify_user_token)):
     """
     Deactivates a link between a professional and a procedure.

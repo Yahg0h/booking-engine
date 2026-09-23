@@ -26,11 +26,13 @@ from app.api.v1.services.procedure_service import search_procedure_by_id
 from app.api.v1.services.professional_service import (
     search_professional_by_id,
 )
+from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1/root")
 
 @router.post("/appointments", status_code=201)
+@limiter.limit("50/minute")
 async def create_appointment_route(request: Request, appointment: AppointmentCreate, user_id: int = Depends(verify_user_token)):
     """
     Creates a new appointment for the root administrator.
@@ -124,7 +126,8 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
         return success_dict
 
 @router.get("/appointments", status_code=200)
-async def list_appointments(organization_id: int,
+@limiter.limit("200/minute")
+async def list_appointments(request: Request, organization_id: int,
                             customer_id: int | None = None,
                             professional_id: int | None = None,
                             procedure_id: int | None = None,
@@ -162,7 +165,8 @@ async def list_appointments(organization_id: int,
     return registered_appointments
 
 @router.get("/appointments/{id}", status_code=200)
-async def get_appointment(id: int, user_id: int = Depends(verify_user_token)):
+@limiter.limit("200/minute")
+async def get_appointment(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Retrieves information about a specific appointment by ID.
 
@@ -190,6 +194,7 @@ async def get_appointment(id: int, user_id: int = Depends(verify_user_token)):
     return appointment
 
 @router.patch("/appointments/{id}", status_code=200)
+@limiter.limit("50/minute")
 async def update_appointment(request: Request, id: int, appointment: AppointmentUpdate, user_id: int = Depends(verify_user_token)):
     """
     Updates the information of an existing appointment.
@@ -288,6 +293,7 @@ async def update_appointment(request: Request, id: int, appointment: Appointment
     return updated_appointment
 
 @router.delete("/appointments/{id}", status_code=200)
+@limiter.limit("30/minute")
 async def cancel_appointment(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Cancels an existing appointment.
