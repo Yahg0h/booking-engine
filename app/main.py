@@ -5,6 +5,7 @@ Application entry point to initialize the FastAPI app, configure logging, and re
 from datetime import datetime, timezone
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import HTTPBearer
 
@@ -39,6 +40,15 @@ app = FastAPI(
 
 # Initialize HTTP Bearer
 security = HTTPBearer()
+
+# Configure CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS.split(","),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Customize OpenAPI schema to include Bearer token
 def custom_openapi():
