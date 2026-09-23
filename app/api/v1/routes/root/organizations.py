@@ -15,6 +15,9 @@ from app.api.v1.services.organization_service import (
     search_organization_by_id,
     update_organization,
 )
+from app.api.v1.services.organization_settings_service import (
+    create_organization_settings,
+)
 from app.api.v1.services.permission_service import is_root
 
 # Configure router
@@ -43,6 +46,7 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
 
     # Create the organization
     recent_org = await create_organization(org_data.name, org_data.slug, org_data.min_work_time, org_data.max_work_time)
+    await create_organization_settings(recent_org)
 
     # Return the success message
     if recent_org:

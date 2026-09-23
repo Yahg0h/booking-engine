@@ -29,6 +29,11 @@ class AppointmentStatus(str, Enum):
     NO_SHOW = "NO_SHOW"
 
 
+class BlackoutStatus(str, Enum):
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+
 # ==========================================
 # 2. ORGANIZATION SCHEMAS
 # ==========================================
@@ -68,7 +73,66 @@ class OrganizationResponse(OrganizationBase):
 
 
 # ==========================================
-# 3. USER SCHEMAS
+# 3. ORGANIZATION SETTINGS SCHEMAS
+# ==========================================
+
+class OrganizationSettingsBase(BaseModel):
+    operating_weekdays: list[int] = Field(...)
+    cancellation_buffer_hours: int = Field(...)
+
+    @model_validator(mode="after")
+    def validate_operating_weekdays(self) -> "OrganizationSettingsBase":
+        # Verify if all numbers are between 1 and 7
+        if not all(1 <= x <= 7 for x in self.operating_weekdays):
+            raise ValueError("operating_weekdays must contain only values between 1 and 7.")
+        # Verify if the list is not empty
+        if not self.operating_weekdays:
+            raise ValueError("operating_weekdays cannot be empty.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_cancellation_buffer(self) -> "OrganizationSettingsBase":
+        if self.cancellation_buffer_hours <= 0:
+            raise ValueError("cancellation_buffer_hours must be greater than 0.")
+        return self
+
+
+class OrganizationSettingsCreate(OrganizationSettingsBase):
+    pass
+
+
+class OrganizationSettingsUpdate(BaseModel):
+    operating_weekdays: list[int] | None = Field(default=None)
+    cancellation_buffer_hours: int | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def validate_operating_weekdays(self) -> "OrganizationSettingsUpdate":
+        if self.operating_weekdays is not None:
+            if not all(1 <= x <= 7 for x in self.operating_weekdays):
+                raise ValueError("operating_weekdays must contain only values between 1 and 7.")
+            if not self.operating_weekdays:
+                raise ValueError("operating_weekdays cannot be empty.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_cancellation_buffer(self) -> "OrganizationSettingsUpdate":
+        if self.cancellation_buffer_hours is not None and self.cancellation_buffer_hours <= 0:
+            raise ValueError("cancellation_buffer_hours must be greater than 0.")
+        return self
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class OrganizationSettingsResponse(OrganizationSettingsBase):
+    organization_id: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ==========================================
+# 4. USER SCHEMAS
 # ==========================================
 
 class UserBase(BaseModel):
@@ -126,7 +190,7 @@ class TokenResponse(BaseModel):
 
 
 # ==========================================
-# 4. PROFESSIONAL SCHEMAS
+# 5. PROFESSIONAL SCHEMAS
 # ==========================================
 
 class ProfessionalBase(BaseModel):
@@ -161,7 +225,7 @@ class ProfessionalResponse(ProfessionalBase):
 
 
 # ==========================================
-# 5. PROCEDURE SCHEMAS
+# 6. PROCEDURE SCHEMAS
 # ==========================================
 
 class ProcedureBase(BaseModel):
@@ -196,7 +260,7 @@ class ProcedureResponse(ProcedureBase):
 
 
 # ==========================================
-# 6. PROFESSIONAL-PROCEDURE SCHEMAS
+# 7. PROFESSIONAL-PROCEDURE SCHEMAS
 # ==========================================
 
 class ProfessionalProcedureBase(BaseModel):
@@ -233,7 +297,7 @@ class ProfessionalProcedureResponse(ProfessionalProcedureBase):
 
 
 # ==========================================
-# 7. WORKING HOURS SCHEMAS
+# 8. WORKING HOURS SCHEMAS
 # ==========================================
 
 class WorkingHoursBase(BaseModel):
@@ -272,13 +336,14 @@ class WorkingHoursResponse(WorkingHoursBase):
 
 
 # ==========================================
-# 8. BLACKOUT SCHEMAS
+# 9. BLACKOUT SCHEMAS
 # ==========================================
 
 class BlackoutBase(BaseModel):
     start_at: datetime
     end_at: datetime
     reason: str = Field(default=None, max_length=255)
+    status: BlackoutStatus = BlackoutStatus.PENDING
 
     @model_validator(mode="after")
     def validate_period(self) -> "BlackoutBase":
@@ -295,6 +360,7 @@ class BlackoutUpdate(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     reason: str = Field(default=None, max_length=255)
+    status: BlackoutStatus| None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -302,6 +368,7 @@ class BlackoutUpdate(BaseModel):
 class BlackoutResponse(BlackoutBase):
     id: int
     professional_id: int
+    status: str
     created_at: datetime
     updated_at: datetime
 
@@ -309,7 +376,7 @@ class BlackoutResponse(BlackoutBase):
 
 
 # ==========================================
-# 9. CUSTOMER SCHEMAS
+# 10. CUSTOMER SCHEMAS
 # ==========================================
 
 class CustomerBase(BaseModel):
@@ -349,7 +416,7 @@ class CustomerResponse(CustomerBase):
 
 
 # ==========================================
-# 10. APPOINTMENT SCHEMAS
+# 11. APPOINTMENT SCHEMAS
 # ==========================================
 
 class AppointmentBase(BaseModel):
@@ -396,7 +463,7 @@ class AppointmentReschedule(BaseModel):
 
 
 # ==========================================
-# 11. AUDIT LOG SCHEMAS
+# 12. AUDIT LOG SCHEMAS
 # ==========================================
 
 class AuditLogBase(BaseModel):

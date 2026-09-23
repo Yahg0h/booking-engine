@@ -7,7 +7,11 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from app.api.v1.schemas.schemas import OrganizationCreate, OrganizationUpdate
+from app.api.v1.schemas.schemas import (
+    OrganizationCreate,
+    OrganizationSettingsUpdate,
+    OrganizationUpdate,
+)
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.organization_service import (
@@ -15,6 +19,11 @@ from app.api.v1.services.organization_service import (
     create_organization,
     search_organization_by_id,
     update_organization,
+)
+from app.api.v1.services.organization_settings_service import (
+    create_organization_settings,
+    get_organization_settings,
+    update_organization_settings,
 )
 from app.api.v1.services.permission_service import is_root
 
@@ -44,6 +53,7 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
 
     # Create the organization
     recent_org = await create_organization(org_data.name, org_data.slug, org_data.min_work_time, org_data.max_work_time)
+    await create_organization_settings(recent_org)
 
     # ==== AUDIT LOGS ENTRY ====
     # Add new values to a dict and log action
@@ -157,7 +167,7 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
     
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Log action
         await log_action(
             organization_id=id,
@@ -171,7 +181,7 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
-        
+
         # ==== STRUCTURED LOGGING ====
         # Sanitize time fields
         updated_values = {}
@@ -189,3 +199,103 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
         )
 
         return is_updated
+
+# ==========================================
+# ORGANIZATION SETTINGS ROUTES
+# ==========================================
+@router.get("/organizations/{id}/settings", status_code=200)
+async def get_org_settings(id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves the settings for a specific organization.
+
+    Args:
+        id: The ID of the organization
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The organization's settings
+
+    Raises:
+        HTTPException: If the organization is not found or if access is denied
+    """
+    # Check if the organization exists
+    is_real = await search_organization_by_id(id)
+
+    if not is_real:
+        raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
+
+    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
+    if not await check_organization_access(user_id, is_real["id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+
+    # Else, get the organization settings information and return it
+    org_settings = await get_organization_settings(id)
+
+    return org_settings
+
+@router.patch("/organizations/{id}/settings", status_code=200)
+async def update_org_settings(request: Request, id: int, settings: OrganizationSettingsUpdate, user_id: int = Depends(verify_user_token)):
+    """
+    Updates selected settings for a specific organization.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the organization
+        settings: The organization settings update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict | None: The updated organization settings, or None if no fields were changed
+
+    Raises:
+        HTTPException: If the organization is not found or if access is denied
+    """
+    # Check if the organization exists
+    is_real = await search_organization_by_id(id)
+
+    if not is_real:
+        raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
+
+    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
+    if not await check_organization_access(user_id, is_real["id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+
+    # Get the organization current settings
+    old_values = await get_organization_settings(id)
+
+    # Else, update
+    is_updated = await update_organization_settings(id, settings.operating_weekdays, settings.cancellation_buffer_hours)
+
+    if is_updated:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {}
+        if settings.operating_weekdays is not None: new_values["operating_weekdays"] = settings.operating_weekdays
+        if settings.cancellation_buffer_hours is not None: new_values["cancellation_buffer_hours"] = settings.cancellation_buffer_hours
+
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Log action
+        await log_action(
+            organization_id=id,
+            actor_user_id=user_id,
+            action='UPDATE',
+            entity_type='ORGANIZATION SETTINGS',
+            entity_id=id,
+            old_values=old_values,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+        
+        # ==== STRUCTURED LOGGING ====
+        # Log
+        logger.info(
+            f"Organization Settings updated "
+            f"organization_id={id}, "
+            f"field_changed={list(new_values.keys())}"
+        )
+
+    return is_updated

@@ -31,6 +31,7 @@ from app.api.v1.services.procedure_service import (
     search_procedure_by_id,
 )
 from app.api.v1.services.professional_service import (
+    approve_blackout,
     change_is_active,
     check_existing_weekday,
     check_professional_access,
@@ -41,6 +42,7 @@ from app.api.v1.services.professional_service import (
     list_blackouts_by_professional,
     list_professionals_by_org,
     list_working_hours_by_professional,
+    reject_blackout,
     search_blackout_by_id,
     search_professional_by_id,
     search_working_hour_by_id,
@@ -626,7 +628,7 @@ async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, u
         raise HTTPException(status_code=422, detail="The start or end date for the blackout must be from today onwards.")
 
     # Else, create blackout
-    recent_blackout_id = await create_blackouts(id, blackout.start_at, blackout.end_at, blackout.reason)
+    recent_blackout_id = await create_blackouts(id, blackout.start_at, blackout.end_at, blackout.reason, "PENDING")
 
     # Return success message
     if recent_blackout_id:
@@ -735,6 +737,142 @@ async def get_blackout(id: int, user_id: int = Depends(verify_user_token)):
 
     # Else, return the blackout
     return blackout
+
+@router.post("/blackouts/{id}/approve", status_code=200)
+async def approve_blackout_route(request: Request, id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Approves a blackout.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the blackout
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated blackout information
+
+    Raises:
+        HTTPException: If the blackout is not found or if access is denied
+    """
+    # Check if the current user is the owner of the organization the professional is linked to or root
+    blackout = await search_blackout_by_id(id)
+
+    # Check if the blackout exists
+    if not blackout:
+        raise HTTPException(status_code=404, detail="Blackout not found or doesn't exist.")
+
+    # Get current user information and professional information for owner verification
+    professional = await search_professional_by_id(blackout["professional_id"])
+
+    # If the owner conditions fail, return 403
+    if not await check_professional_access(user_id, professional["organization_id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+
+    # Else, approve blackout
+    approved_blackout = await approve_blackout(id)
+
+    if approved_blackout:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {
+            "status": "ACCEPTED"
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get user organization_id
+        user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=user_organization_id,
+            actor_user_id=user_id,
+            action='UPDATE',
+            entity_type='BLACKOUT',
+            entity_id=id,
+            old_values=blackout,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Blackout accepted: id={id}, "
+            f"org_id={user_organization_id}"
+        )
+
+    return approved_blackout
+
+@router.post("/blackouts/{id}/reject", status_code=200)
+async def reject_blackout_route(request: Request, id: int, user_id: int = Depends(verify_user_token)):
+    """
+    Rejects a blackout.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the blackout
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated blackout information
+
+    Raises:
+        HTTPException: If the blackout is not found or if access is denied
+    """
+    # Check if the current user is the owner of the organization the professional is linked to or root
+    blackout = await search_blackout_by_id(id)
+
+    # Check if the blackout exists
+    if not blackout:
+        raise HTTPException(status_code=404, detail="Blackout not found or doesn't exist.")
+
+    # Get current user information and professional information for owner verification
+    professional = await search_professional_by_id(blackout["professional_id"])
+
+    # If the owner conditions fail, return 403
+    if not await check_professional_access(user_id, professional["organization_id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+
+    # Else, reject blackout
+    rejected_blackout = await reject_blackout(id)
+
+    if rejected_blackout:
+        # ==== AUDIT LOGS ENTRY ====
+        # Add new values to a dict and log action
+        new_values = {
+            "status": "REJECTED"
+        }
+    
+        # Get IP Address
+        ip_address = get_ip_from_request(request)
+    
+        # Get user organization_id
+        user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
+    
+        # Log action
+        await log_action(
+            organization_id=user_organization_id,
+            actor_user_id=user_id,
+            action='UPDATE',
+            entity_type='BLACKOUT',
+            entity_id=id,
+            old_values=blackout,
+            new_values=new_values,
+            metadata={"source": "api", "version": "1.0"},
+            ip_address=ip_address
+        )
+        # ==== END OF AUDIT LOGS ENTRY ====
+
+        # ==== STRUCTURED LOGGING ====
+        logger.info(
+            f"Blackout rejected: id={id}, "
+            f"org_id={user_organization_id}"
+        )
+
+    return rejected_blackout
 
 # ==========================================
 # PROFESSIONAL-PROCEDURES RELATIONS ROUTES

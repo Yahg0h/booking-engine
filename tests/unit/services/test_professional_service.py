@@ -13,6 +13,7 @@ import pytest
 from app.api.v1.services.professional_service import (
     change_buffer_time,
     change_is_active,
+    approve_blackout,
     check_existing_weekday,
     check_professional_access,
     create_professionals,
@@ -21,6 +22,7 @@ from app.api.v1.services.professional_service import (
     list_professionals_by_org,
     search_professional_by_id,
     search_professional_by_user_id,
+    reject_blackout,
     update_professional,
     update_working_hours,
 )
@@ -430,6 +432,42 @@ async def test_change_buffer_time_returns_updated_row():
         result = await change_buffer_time(id=1, buffer_time_minutes=30)
 
     assert result["buffer_time_minutes"] == 30
+
+
+# ==========================================
+# approve_blackout / reject_blackout
+# ==========================================
+
+@pytest.mark.asyncio
+async def test_approve_blackout_updates_status_to_accepted():
+    updated_blackout = {"id": 4, "professional_id": 1, "status": "ACCEPTED"}
+    mock_conn = _make_conn(mapping_val=updated_blackout)
+
+    with patch("app.api.v1.services.professional_service.engine") as mock_engine:
+        mock_engine.begin.return_value = mock_conn
+
+        result = await approve_blackout(blackout_id=4)
+
+    assert result == updated_blackout
+    assert mock_conn.execute.await_count == 2
+    update_params = mock_conn.execute.call_args_list[0][0][1]
+    assert update_params == {"status": "ACCEPTED", "id": 4}
+
+
+@pytest.mark.asyncio
+async def test_reject_blackout_updates_status_to_rejected():
+    updated_blackout = {"id": 5, "professional_id": 1, "status": "REJECTED"}
+    mock_conn = _make_conn(mapping_val=updated_blackout)
+
+    with patch("app.api.v1.services.professional_service.engine") as mock_engine:
+        mock_engine.begin.return_value = mock_conn
+
+        result = await reject_blackout(blackout_id=5)
+
+    assert result == updated_blackout
+    assert mock_conn.execute.await_count == 2
+    update_params = mock_conn.execute.call_args_list[0][0][1]
+    assert update_params == {"status": "REJECTED", "id": 5}
 
 
 # ==========================================

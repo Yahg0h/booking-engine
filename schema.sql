@@ -28,7 +28,24 @@ CREATE TABLE organizations (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 2. USERS
+-- 2. ORGANIZATION SETTINGS
+-- ============================================================
+CREATE TABLE organization_settings (
+    organization_id BIGINT UNSIGNED PRIMARY KEY,
+    operating_weekdays JSON NOT NULL,
+    cancellation_buffer_hours INT UNSIGNED NOT NULL DEFAULT 24,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_organization_settings_organization
+        FOREIGN KEY (organization_id)
+        REFERENCES organizations (id)
+        ON UPDATE CASCADE
+        ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- 3. USERS
 -- ============================================================
 -- ROOT has organization_id = NULL.
 -- OWNER and STAFF must have organization_id set.
@@ -58,7 +75,7 @@ CREATE TABLE users (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 3. PROFESSIONALS
+-- 4. PROFESSIONALS
 -- ============================================================
 -- user_id is required. If the linked User is removed, the professional
 -- remains and user_id becomes NULL. Cross-organization consistency
@@ -94,7 +111,7 @@ CREATE TABLE professionals (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 4. PROCEDURES
+-- 5. PROCEDURES
 -- ============================================================
 
 CREATE TABLE procedures (
@@ -121,7 +138,7 @@ CREATE TABLE procedures (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 5. PROFESSIONAL_PROCEDURES
+-- 6. PROFESSIONAL_PROCEDURES
 -- ============================================================
 -- Many-to-many relation between professionals and procedures.
 -- Organization consistency is enforced by the backend.
@@ -158,7 +175,7 @@ CREATE TABLE professional_procedures (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 6. WORKING_HOURS
+-- 7. WORKING_HOURS
 -- ============================================================
 -- Exactly one interval per weekday per professional is enforced
 -- by UNIQUE(professional_id, weekday).
@@ -187,7 +204,7 @@ CREATE TABLE working_hours (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 7. BLACKOUTS
+-- 8. BLACKOUTS
 -- ============================================================
 
 CREATE TABLE blackouts (
@@ -196,6 +213,7 @@ CREATE TABLE blackouts (
     start_at DATETIME NOT NULL,
     end_at DATETIME NOT NULL,
     reason VARCHAR(255) NULL,
+    status ENUM('PENDING', 'ACCEPTED', 'REJECTED') NOT NULL DEFAULT 'PENDING',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
@@ -211,7 +229,7 @@ CREATE TABLE blackouts (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 8. CUSTOMERS
+-- 9. CUSTOMERS
 -- ============================================================
 
 CREATE TABLE customers (
@@ -239,7 +257,7 @@ CREATE TABLE customers (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 9. APPOINTMENTS
+-- 10. APPOINTMENTS
 -- ============================================================
 -- start_at/end_at represent the procedure's actual reserved time.
 -- Professional buffer is handled by the Availability/Booking logic,
@@ -293,7 +311,7 @@ CREATE TABLE appointments (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- 10. AUDIT_LOGS
+-- 11. AUDIT_LOGS
 -- ============================================================
 -- Append-only by application policy.
 -- old_values/new_values are native MySQL JSON columns.

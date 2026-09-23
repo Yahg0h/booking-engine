@@ -518,6 +518,64 @@ async def test_get_blackouts_professional_not_found_returns_404(client):
 
 
 # ==========================================
+# POST /v1/blackouts/{id}/approve and /reject
+# ==========================================
+
+@pytest.mark.asyncio
+async def test_approve_blackout_as_owner_returns_accepted(client):
+    root = await api_register_root(client)
+    root_headers = await api_login_headers(client, root["email"], root["password"])
+    data = await setup_org_with_owner(client, root_headers)
+    prof = await api_create_professional(client, data["owner_headers"], data["org"]["id"], data["owner"]["id"])
+
+    future_start = (datetime.now(timezone.utc) + timedelta(days=5)).strftime("%Y-%m-%dT%H:%M:%S")
+    future_end = (datetime.now(timezone.utc) + timedelta(days=6)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    with patch.object(professionals_route, "search_professional_by_id", new=search_professional_as_dict):
+        create_response = await client.post(
+            f"/v1/professionals/{prof['id']}/blackouts",
+            json={"start_at": future_start, "end_at": future_end, "reason": "Vacation"},
+            headers=data["owner_headers"],
+        )
+
+    assert create_response.status_code == 201
+    blackout_id = int(create_response.json()["message"].split("BlackoutID = ")[1].rstrip("."))
+
+    with patch.object(professionals_route, "search_professional_by_id", new=search_professional_as_dict):
+        response = await client.post(f"/v1/blackouts/{blackout_id}/approve", headers=data["owner_headers"])
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ACCEPTED"
+
+
+@pytest.mark.asyncio
+async def test_reject_blackout_as_owner_returns_rejected(client):
+    root = await api_register_root(client)
+    root_headers = await api_login_headers(client, root["email"], root["password"])
+    data = await setup_org_with_owner(client, root_headers)
+    prof = await api_create_professional(client, data["owner_headers"], data["org"]["id"], data["owner"]["id"])
+
+    future_start = (datetime.now(timezone.utc) + timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
+    future_end = (datetime.now(timezone.utc) + timedelta(days=8)).strftime("%Y-%m-%dT%H:%M:%S")
+
+    with patch.object(professionals_route, "search_professional_by_id", new=search_professional_as_dict):
+        create_response = await client.post(
+            f"/v1/professionals/{prof['id']}/blackouts",
+            json={"start_at": future_start, "end_at": future_end, "reason": "Personal"},
+            headers=data["owner_headers"],
+        )
+
+    assert create_response.status_code == 201
+    blackout_id = int(create_response.json()["message"].split("BlackoutID = ")[1].rstrip("."))
+
+    with patch.object(professionals_route, "search_professional_by_id", new=search_professional_as_dict):
+        response = await client.post(f"/v1/blackouts/{blackout_id}/reject", headers=data["owner_headers"])
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "REJECTED"
+
+
+# ==========================================
 # POST /v1/professionals/{id}/procedures
 # ==========================================
 

@@ -1,5 +1,5 @@
 """
-All services related to user management used across all Booking Engine routes.
+All services related to organization management used across all Booking Engine routes.
 """
 
 from datetime import time

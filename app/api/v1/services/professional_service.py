@@ -370,7 +370,7 @@ async def change_buffer_time(id: int, buffer_time_minutes: int) -> dict | None:
 
 # BLACKOUTS related services (professionals only)
 
-async def create_blackouts(professional_id: int, start_at: datetime, end_at: datetime, reason: str) -> int:
+async def create_blackouts(professional_id: int, start_at: datetime, end_at: datetime, reason: str, status: str = "PENDING") -> int:
     """
     Creates a blackout window for a professional.
 
@@ -385,10 +385,10 @@ async def create_blackouts(professional_id: int, start_at: datetime, end_at: dat
     """
     async with engine.begin() as conn:
         create_query = """
-        INSERT INTO blackouts (professional_id, start_at, end_at, reason)
-        VALUES (:professional_id, :start_at, :end_at, :reason)
+        INSERT INTO blackouts (professional_id, start_at, end_at, reason, status)
+        VALUES (:professional_id, :start_at, :end_at, :reason, :status)
         """
-        await conn.execute(text(create_query), {"professional_id": professional_id, "start_at": start_at, "end_at": end_at, "reason": reason})
+        await conn.execute(text(create_query), {"professional_id": professional_id, "start_at": start_at, "end_at": end_at, "reason": reason, "status": status})
 
         select_query = """
         SELECT id FROM blackouts
@@ -481,6 +481,50 @@ async def update_blackout(id: int, professional_id: int, start_at: datetime | No
         recent_blackout = retrieve_query.mappings().one_or_none()
 
     return recent_blackout
+
+async def approve_blackout(blackout_id: int) -> dict | None:
+    """
+    Approves a pending blackout.
+
+    Args:
+        id: The blackout ID to update
+
+    Returns:
+        dict | None: The updated blackout record, with the status 'ACCEPTED'
+    """
+    status = 'ACCEPTED'
+    
+    async with engine.begin() as conn:
+        await conn.execute(text("UPDATE blackouts SET status = :status WHERE id = :id"), 
+                          {"status": status, "id": blackout_id})
+        
+        retrieve_query = await conn.execute(text("SELECT * FROM blackouts WHERE id = :id"), 
+                                           {"id": blackout_id})
+        updated_blackout = retrieve_query.mappings().one_or_none()
+    
+    return updated_blackout
+
+async def reject_blackout(blackout_id: int) -> dict | None:
+    """
+    Rejects a pending blackout.
+
+    Args:
+        id: The blackout ID to update
+
+    Returns:
+        dict | None: The updated blackout record, with the status 'REJECTED'
+    """
+    status = 'REJECTED'
+    
+    async with engine.begin() as conn:
+        await conn.execute(text("UPDATE blackouts SET status = :status WHERE id = :id"), 
+                          {"status": status, "id": blackout_id})
+        
+        retrieve_query = await conn.execute(text("SELECT * FROM blackouts WHERE id = :id"), 
+                                           {"id": blackout_id})
+        updated_blackout = retrieve_query.mappings().one_or_none()
+    
+    return updated_blackout
 
 # Access verification function
 async def check_professional_access(user_id: int, organization_id: int) -> bool:
