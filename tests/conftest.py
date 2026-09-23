@@ -81,6 +81,7 @@ async def client():
             module.engine = test_engine
 
     from app.main import app
+    app.state.limiter._storage.reset()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 

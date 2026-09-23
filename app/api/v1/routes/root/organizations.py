@@ -19,12 +19,14 @@ from app.api.v1.services.organization_settings_service import (
     create_organization_settings,
 )
 from app.api.v1.services.permission_service import is_root
+from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1/root")
 
 # CREATE a organization (root)
 @router.post("/organizations", status_code=201)
+@limiter.limit("50/minute")
 async def create_org(request: Request, org_data: OrganizationCreate, user_id: int | None = Depends(verify_user_token)):
     """
     Creates a new organization for the root administrator.
@@ -89,7 +91,8 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
 
 # READ a organizations info (root)
 @router.get("/organizations/{id}", status_code=200)
-async def get_organization(id: int, user_id: int | None = Depends(verify_user_token)):
+@limiter.limit("200/minute")
+async def get_organization(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
     """
     Retrieves information about a specific organization.
 
@@ -120,6 +123,7 @@ async def get_organization(id: int, user_id: int | None = Depends(verify_user_to
 
 # UPDATE a organization's information (root)
 @router.patch("/organizations/{id}", status_code=200)
+@limiter.limit("50/minute")
 async def update_org(request: Request, id: int, org_data: OrganizationUpdate, user_id: int | None = Depends(verify_user_token)):
     """
     Updates the information of an existing organization.

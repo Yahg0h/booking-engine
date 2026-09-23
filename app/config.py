@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     JWT_SECRET: str
     ALGORITHM: str = "HS256"
     TOKEN_EXPIRATION_MINS: int = 1440
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
 
     # ==== EXTERNAL APIs ====
     REDIS_SECRET_KEY: str

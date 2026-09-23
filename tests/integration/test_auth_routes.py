@@ -98,3 +98,30 @@ async def test_login_unknown_email_returns_404(client):
         "password": "doesntmatter"
     })
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_login_rate_limit_allows_five_attempts_and_rejects_sixth(client):
+    """Login allows five attempts per minute from the same client IP."""
+    from app.main import limiter
+
+    limiter._storage.reset()
+
+    try:
+        payload = {
+            "email": unique_email(),
+            "password": "doesntmatter",
+        }
+
+        responses = [
+            await client.post("/v1/login", json=payload)
+            for _ in range(6)
+        ]
+
+        assert [response.status_code for response in responses[:5]] == [404] * 5
+        assert responses[5].status_code == 429
+        assert responses[5].json() == {
+            "detail": "Too many requests. Please try again later."
+        }
+    finally:
+        limiter._storage.reset()

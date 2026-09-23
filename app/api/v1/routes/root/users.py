@@ -25,12 +25,14 @@ from app.api.v1.services.user_service import (
     search_user_by_id,
     update_user_admin,
 )
+from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1/root")
 
 # CREATE a new account
 @router.post("/users", status_code=201)
+@limiter.limit("50/minute")
 async def create_account(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
     """
     Creates a new user account for the root administrator.
@@ -109,7 +111,8 @@ async def create_account(request: Request, user: UserCreate, user_id: int | None
 
 # READ all users information
 @router.get("/users", status_code=200)
-async def get_users(user_id: int | None = Depends(verify_user_token)):
+@limiter.limit("200/minute")
+async def get_users(request: Request, user_id: int | None = Depends(verify_user_token)):
     """
     Lists all user accounts across the system.
 
@@ -134,7 +137,8 @@ async def get_users(user_id: int | None = Depends(verify_user_token)):
 
 # Read a specific user information
 @router.get("/users/{id}", status_code=200)
-async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
+@limiter.limit("200/minute")
+async def get_user(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
     """
     Retrieves information about a specific user by ID.
 
@@ -163,6 +167,7 @@ async def get_user(id: int, user_id: int | None = Depends(verify_user_token)):
 
 # UPDATE a user's information
 @router.patch("/users/{id}", status_code=200)
+@limiter.limit("50/minute")
 async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin, user_id: int | None = Depends(verify_user_token)):
     """
     Updates a user's information from an administrator perspective.
@@ -240,6 +245,7 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
     return is_updated
 
 @router.delete("/users/{id}", status_code=200)
+@limiter.limit("30/minute")
 async def delete_user(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
     """
     Deactivates an existing user account.
