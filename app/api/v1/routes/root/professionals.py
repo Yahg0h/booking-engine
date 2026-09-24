@@ -22,6 +22,7 @@ from app.api.v1.services.auth_service import (
     verify_user_token,
 )
 from app.api.v1.services.organization_service import search_organization_by_id
+from app.api.v1.services.organization_settings_service import get_organization_settings
 from app.api.v1.services.permission_service import is_root
 from app.api.v1.services.procedure_service import (
     change_pp_is_active,
@@ -385,6 +386,15 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
     # Verify if the new working hour information isn't on a weekday that already has a working hour registered
     if await check_existing_weekday(workinghours.weekday, id):
         raise HTTPException(status_code=409, detail="A working hour record already exists for the selected day of the week.")
+    
+    # Verify if the professional can work on this day (organization must operate on this day)
+    settings = await get_organization_settings(professional["organization_id"])
+
+    if workinghours.weekday not in settings["operating_weekdays"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Professional cannot work on day {workinghours.weekday}. Organization operates on: {settings['operating_weekdays']}"
+        )
 
     # Check to see if the WorkingHours input is within the organizations max and min work time
     # Convert timedelta to time if needed (UTC 0 for now)
@@ -524,6 +534,15 @@ async def update_working_hour(request: Request, professional_id: int, id: int, w
     # Verify if the new working hour information isn't on a weekday that already has a working hour registered
     if await check_existing_weekday(workinghours.weekday, id):
         raise HTTPException(status_code=409, detail="A working hour record already exists for the selected day of the week.")
+
+    # Verify if the professional can work on this day (organization must operate on this day)
+    settings = await get_organization_settings(professional["organization_id"])
+
+    if workinghours.weekday not in settings["operating_weekdays"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Professional cannot work on day {workinghours.weekday}. Organization operates on: {settings['operating_weekdays']}"
+        )
 
     # Check to see if the WorkingHours input is within the organizations max and min work time
     # Convert timedelta to time if needed (UTC 0 for now)
