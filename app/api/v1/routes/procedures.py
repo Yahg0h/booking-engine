@@ -65,10 +65,10 @@ async def create_procedure_route(request: Request, procedure: ProcedureCreate, u
             "price": procedure.price,
             "is_active": procedure.is_active
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Log action
         await log_action(
             organization_id=procedure.organization_id,
@@ -184,7 +184,7 @@ async def update_procedure_route(request: Request, id: int, procedure: Procedure
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # If all well, update the procedure
-    updated_procedure = await update_procedure(id, procedure.name, procedure.description, procedure.duration_minutes, 
+    updated_procedure = await update_procedure(id, procedure.name, procedure.description, procedure.duration_minutes,
                                                procedure.price, procedure.is_active)
 
     # ==== AUDIT LOGS ENTRY ====
@@ -255,7 +255,7 @@ async def delete_procedure(request: Request, id: int, user_id: int = Depends(ver
 
     # Else, check the owner validation, If it isn't, return 403
     if not await check_procedure_access(user_id, procedure_info["organization_id"]):
-        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.") 
+        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
 
     # Change procedure is_active to false
     is_deleted = await change_procedure_is_active(id, False)
@@ -267,13 +267,13 @@ async def delete_procedure(request: Request, id: int, user_id: int = Depends(ver
         new_values = {
             "is_active": False
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get organization id
         procedure_organization_id = int(procedure_info["organization_id"]) if procedure_info["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=procedure_organization_id,

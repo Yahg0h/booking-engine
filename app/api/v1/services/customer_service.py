@@ -144,7 +144,7 @@ async def update_customers(id: int, name: str | None, email: str | None, phone: 
             return None
 
         query = f"UPDATE customers SET {', '.join(updates)} WHERE id = :id"
-                
+
         await conn.execute(text(query), params)
 
         retrieve_query = await conn.execute(text("SELECT * FROM customers WHERE id = :id"), {"id": id})
@@ -205,21 +205,21 @@ async def check_customer_access(user_id: int, organization_id: int, allow_staff:
     """
     is_owner = await search_user_by_id(user_id)
     is_professional = await search_professional_by_user_id(user_id)
-    
+
     # Bools
     user_is_root = is_owner["organization_id"] is None
     user_is_owner_role = is_owner["role"] == "OWNER"
     user_owns_org = is_owner["organization_id"] == organization_id
     user_is_staff = is_professional is not None and is_professional["organization_id"] == organization_id
-    
+
     # ROOT always passes, if not it must be OWNER + be in the same org
     if user_is_root:
         return True
-    
+
     # If not allow_staff, rejects staff
     if not allow_staff and is_professional:
         return False
-    
+
     # Needs to be in the same org and (be OWNER OR be STAFF, if allowed)
     if allow_staff:
         return user_owns_org and (user_is_owner_role or user_is_staff)

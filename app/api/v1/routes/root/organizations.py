@@ -60,10 +60,10 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
             "min_work_time": org_data.min_work_time,
             "max_work_time": org_data.max_work_time
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Log action
         await log_action(
             organization_id=None,
@@ -161,10 +161,10 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
         if org_data.slug is not None: new_values["slug"] = org_data.slug
         if org_data.min_work_time is not None: new_values["min_work_time"] = org_data.min_work_time
         if org_data.max_work_time is not None: new_values["max_work_time"] = org_data.max_work_time
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Log action
         await log_action(
             organization_id=id,

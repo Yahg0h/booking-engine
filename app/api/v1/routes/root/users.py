@@ -283,17 +283,17 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
         new_values = {
             "is_active": False
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(user_info["organization_id"]) if user_info["organization_id"] else None
-    
+
         # Filter sensive information out of old_values
         old_values = sanitize_audit_values(old_values)
         new_values = sanitize_audit_values(new_values)
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -307,7 +307,7 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
-        
+
         # ==== STRUCTURED LOGGING ====
         logger.info(
             f"ROOT: User account deleted: id={id}, "
@@ -319,4 +319,3 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
         }
 
         return success_dict
-        

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from fastapi import HTTPException, Request
 
-from app.api.v1.services.password_service import hash_password, verify_password
+from app.api.v1.services.password_service import verify_password
 from app.api.v1.services.user_service import search_user_by_email
 from app.config import settings
 
@@ -77,14 +77,14 @@ async def verify_user_token(request: Request) -> int:
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise HTTPException(status_code=401, detail="Unauthorized: Missing token.")
-    
+
     try:
         scheme, token = auth_header.split()
         if scheme.lower() != "bearer":
             raise ValueError("Invalid scheme")
     except ValueError:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid token format.")
-    
+
     try:
         user_id = decode_token(token, ignore_exp=False)
         return user_id
@@ -104,7 +104,7 @@ async def get_current_user_optional(request: Request) -> int | None:
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         return None
-    
+
     try:
         scheme, token = auth_header.split()
         if scheme.lower() != "bearer":

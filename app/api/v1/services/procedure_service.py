@@ -126,7 +126,7 @@ async def update_procedure(id: int, name: str | None, description: str | None, d
             return None
 
         query = f"UPDATE procedures SET {', '.join(updates)} WHERE id = :id"
-                
+
         await conn.execute(text(query), params)
 
         retrieve_query = await conn.execute(text("SELECT * FROM procedures WHERE id = :id"), {"id": id})

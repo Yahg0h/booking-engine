@@ -70,14 +70,14 @@ from app.api.v1.routes.users import router as users_router
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
-    
+
     openapi_schema = get_openapi(
         title="Booking Engine API",
         version="1.0.0",
         description="Multi-tenant appointment booking REST API",
         routes=app.routes,
     )
-    
+
     openapi_schema["components"]["securitySchemes"] = {
         "HTTPBearer": {
             "type": "http",
@@ -85,9 +85,9 @@ def custom_openapi():
             "bearerFormat": "JWT",
         }
     }
-    
+
     openapi_schema["security"] = [{"HTTPBearer": []}]
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 

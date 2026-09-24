@@ -111,7 +111,7 @@ async def create_professional_route(request: Request, professional: Professional
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
-    
+
     # ==== STRUCTURED LOGGING ====
     logger.info(
         f"Professional created: id={created}, "
@@ -327,13 +327,13 @@ async def delete_professional(request: Request, id: int, user_id: int = Depends(
         new_values = {
             "is_active": False
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -440,13 +440,13 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
             "end_time": workinghours.end_time,
             "is_active": workinghours.is_active
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -669,13 +669,13 @@ async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, u
             "end_at": blackout.end_at,
             "reason": blackout.reason
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -810,13 +810,13 @@ async def approve_blackout_route(request: Request, id: int, user_id: int = Depen
         new_values = {
             "status": "ACCEPTED"
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -879,13 +879,13 @@ async def reject_blackout_route(request: Request, id: int, user_id: int = Depend
         new_values = {
             "status": "REJECTED"
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -952,13 +952,13 @@ async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedur
             "procedure_id": pp.procedure_id,
             "is_active": pp.is_active
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -1006,7 +1006,7 @@ async def get_procedures_by_professionals(request: Request, id: int, is_active: 
     """
     # Check if professional exists
     professional_exists = await search_professional_by_id(id)
-    
+
     # If it doesn't, return 404
     if not professional_exists:
         raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
@@ -1065,13 +1065,13 @@ async def delete_professional_procedure(request: Request, id: int, procedure_id:
         new_values = {
             "is_active": False
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
