@@ -368,6 +368,65 @@ async def test_create_working_hour_duplicate_weekday_returns_409(client):
 
 
 @pytest.mark.asyncio
+async def test_create_working_hour_closed_organization_weekday_returns_422(client):
+    root = await api_register_root(client)
+    root_headers = await api_login_headers(client, root["email"], root["password"])
+    data = await setup_org_with_owner(client, root_headers)
+    prof = await api_create_professional(client, data["owner_headers"], data["org"]["id"], data["owner"]["id"])
+
+    settings_response = await client.patch(
+        f"/v1/organizations/{data['org']['id']}/settings",
+        json={"operating_weekdays": [1]},
+        headers=data["owner_headers"],
+    )
+    assert settings_response.status_code == 200
+
+    with patch.object(professionals_route, "search_professional_by_id", new=search_professional_as_dict):
+        response = await client.post(
+            f"/v1/professionals/{prof['id']}/working-hours",
+            json={"weekday": 2, "start_time": "09:00:00", "end_time": "17:00:00", "is_active": True},
+            headers=data["owner_headers"],
+        )
+
+    assert response.status_code == 422
+    assert "cannot work on day 2" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_working_hour_closed_organization_weekday_returns_422(client):
+    root = await api_register_root(client)
+    root_headers = await api_login_headers(client, root["email"], root["password"])
+    data = await setup_org_with_owner(client, root_headers)
+    prof = await api_create_professional(client, data["owner_headers"], data["org"]["id"], data["owner"]["id"])
+
+    settings_response = await client.patch(
+        f"/v1/organizations/{data['org']['id']}/settings",
+        json={"operating_weekdays": [1]},
+        headers=data["owner_headers"],
+    )
+    assert settings_response.status_code == 200
+
+    with patch.object(professionals_route, "search_professional_by_id", new=search_professional_as_dict):
+        create_response = await client.post(
+            f"/v1/professionals/{prof['id']}/working-hours",
+            json={"weekday": 1, "start_time": "09:00:00", "end_time": "17:00:00", "is_active": True},
+            headers=data["owner_headers"],
+        )
+    assert create_response.status_code in (200, 201)
+    working_hour_id = int(create_response.json()["message"].split("WkID = ")[1].split(",")[0])
+
+    with patch.object(professionals_route, "search_professional_by_id", new=search_professional_as_dict):
+        response = await client.patch(
+            f"/v1/professionals/{prof['id']}/working-hours/{working_hour_id}",
+            json={"weekday": 2},
+            headers=data["owner_headers"],
+        )
+
+    assert response.status_code == 422
+    assert "cannot work on day 2" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_create_working_hour_no_token_returns_401(client):
     response = await client.post(
         "/v1/professionals/1/working-hours",

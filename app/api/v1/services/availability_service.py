@@ -77,7 +77,7 @@ async def availability_service(organization_id: int, professional_id: int, proce
     # Get the organizations min and max work time
     org_min_work = _timedelta_to_time(organization["min_work_time"])
     org_max_work = _timedelta_to_time(organization["max_work_time"])
-    
+
     organization_start = datetime.combine(date, org_min_work)
     organization_end = datetime.combine(date, org_max_work)
 
@@ -113,7 +113,7 @@ async def availability_service(organization_id: int, professional_id: int, proce
 
             # Create a new list to keep all remaining free intervals (specially necessary if a blackout is registered)
             new_intervals = []
-    
+
             # Check how the blackout affects each free interval
             for interval_start, interval_end in blackout_intervals:
                 # If there isn't any overlap, keep the entire intevral (add it to the list)

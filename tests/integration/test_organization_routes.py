@@ -188,3 +188,46 @@ async def test_update_organization_owner_of_different_org_returns_403(client):
         headers=data_a["owner_headers"]
     )
     assert response.status_code == 403
+
+
+# ==========================================
+# GET/PATCH /v1/organizations/{id}/settings
+# ==========================================
+
+@pytest.mark.asyncio
+async def test_get_organization_settings_returns_defaults(client):
+    root = await api_register_root(client)
+    root_headers = await api_login_headers(client, root["email"], root["password"])
+    data = await setup_org_with_owner(client, root_headers)
+
+    response = await client.get(
+        f"/v1/organizations/{data['org']['id']}/settings",
+        headers=data["owner_headers"],
+    )
+
+    assert response.status_code == 200
+    assert response.json()["operating_weekdays"] == [1, 2, 3, 4, 5, 6, 7]
+    assert response.json()["cancellation_buffer_hours"] == 24
+
+
+@pytest.mark.asyncio
+async def test_patch_organization_settings_updates_weekdays_and_buffer(client):
+    root = await api_register_root(client)
+    root_headers = await api_login_headers(client, root["email"], root["password"])
+    data = await setup_org_with_owner(client, root_headers)
+
+    response = await client.patch(
+        f"/v1/organizations/{data['org']['id']}/settings",
+        json={"operating_weekdays": [1, 2, 3, 4, 5], "cancellation_buffer_hours": 48},
+        headers=data["owner_headers"],
+    )
+
+    assert response.status_code == 200
+
+    settings_response = await client.get(
+        f"/v1/organizations/{data['org']['id']}/settings",
+        headers=data["owner_headers"],
+    )
+    assert settings_response.status_code == 200
+    assert settings_response.json()["operating_weekdays"] == [1, 2, 3, 4, 5]
+    assert settings_response.json()["cancellation_buffer_hours"] == 48

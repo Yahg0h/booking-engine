@@ -23,6 +23,7 @@ from app.api.v1.services.auth_service import (
     verify_user_token,
 )
 from app.api.v1.services.organization_service import search_organization_by_id
+from app.api.v1.services.organization_settings_service import get_organization_settings
 from app.api.v1.services.permission_service import is_root
 from app.api.v1.services.procedure_service import (
     change_pp_is_active,
@@ -110,7 +111,7 @@ async def create_professional_route(request: Request, professional: Professional
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
-    
+
     # ==== STRUCTURED LOGGING ====
     logger.info(
         f"Professional created: id={created}, "
@@ -326,13 +327,13 @@ async def delete_professional(request: Request, id: int, user_id: int = Depends(
         new_values = {
             "is_active": False
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -396,6 +397,15 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
     if await check_existing_weekday(workinghours.weekday, id):
         raise HTTPException(status_code=409, detail="A working hour record already exists for the selected day of the week.")
 
+    # Verify if the professional can work on this day (organization must operate on this day)
+    settings = await get_organization_settings(professional["organization_id"])
+
+    if workinghours.weekday not in settings["operating_weekdays"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Professional cannot work on day {workinghours.weekday}. Organization operates on: {settings['operating_weekdays']}"
+        )
+
     # Check to see if the WorkingHours input is within the organizations max and min work time
     # Convert timedelta to time if needed (UTC 0 for now)
     min_time = organization["min_work_time"]
@@ -430,13 +440,13 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
             "end_time": workinghours.end_time,
             "is_active": workinghours.is_active
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -530,6 +540,15 @@ async def update_working_hour(request: Request, professional_id: int, id: int, w
     # Verify if the new working hour information isn't on a weekday that already has a working hour registered
     if await check_existing_weekday(workinghours.weekday, id):
         raise HTTPException(status_code=409, detail="A working hour record already exists for the selected day of the week.")
+
+    # Verify if the professional can work on this day (organization must operate on this day)
+    settings = await get_organization_settings(professional["organization_id"])
+
+    if workinghours.weekday not in settings["operating_weekdays"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Professional cannot work on day {workinghours.weekday}. Organization operates on: {settings['operating_weekdays']}"
+        )
 
     # Check to see if the WorkingHours input is within the organizations max and min work time
     # Convert timedelta to time if needed (UTC 0 for now)
@@ -650,13 +669,13 @@ async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, u
             "end_at": blackout.end_at,
             "reason": blackout.reason
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -791,13 +810,13 @@ async def approve_blackout_route(request: Request, id: int, user_id: int = Depen
         new_values = {
             "status": "ACCEPTED"
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -860,13 +879,13 @@ async def reject_blackout_route(request: Request, id: int, user_id: int = Depend
         new_values = {
             "status": "REJECTED"
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -933,13 +952,13 @@ async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedur
             "procedure_id": pp.procedure_id,
             "is_active": pp.is_active
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -987,7 +1006,7 @@ async def get_procedures_by_professionals(request: Request, id: int, is_active: 
     """
     # Check if professional exists
     professional_exists = await search_professional_by_id(id)
-    
+
     # If it doesn't, return 404
     if not professional_exists:
         raise HTTPException(status_code=404, detail="Professional not found or doesn't exist.")
@@ -1046,13 +1065,13 @@ async def delete_professional_procedure(request: Request, id: int, procedure_id:
         new_values = {
             "is_active": False
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(professional["organization_id"]) if professional["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,

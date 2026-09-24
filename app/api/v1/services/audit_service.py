@@ -154,7 +154,7 @@ def sanitize_audit_values(data: dict | None) -> dict | None:
     """
     if not data:
         return None
-    
+
     sanitized = data.copy()
     sanitized.pop("password_hash", None)
     return sanitized

@@ -176,7 +176,7 @@ async def list_appointments_by_time_frame(organization_id: int, professional_id:
         results = query.mappings().all()
 
         registered_appointments = [dict(appoint_row) for appoint_row in results]
-                
+
     return registered_appointments
 
 async def update_appointments(id: int, organization_id: int, customer_id: int,
@@ -293,13 +293,13 @@ async def check_appointment_access(user_id: int, organization_id: int):
     """
     is_owner = await search_user_by_id(user_id)
     is_professional = await search_professional_by_user_id(user_id)
-    
+
     user_is_root = is_owner["organization_id"] is None
     user_is_owner_role = is_owner["role"] == "OWNER"
     user_owns_org = is_owner["organization_id"] == organization_id
     user_is_staff = is_professional is not None and is_professional["organization_id"] == organization_id
-    
+
     if user_is_root:
         return True
-    
+
     return user_owns_org and (user_is_owner_role or user_is_staff)

@@ -32,7 +32,7 @@ async def create_user(
     Returns:
         int: The ID of the newly created user
     """
-    
+
     # Hash the user's password
     hashed_pass = hash_password(password)
 
@@ -193,7 +193,7 @@ async def list_users_filtered(organization_id: int | None, role: int | None, is_
         filtered_users = [dict(user_row) for user_row in users]
 
     return filtered_users
-        
+
 
 async def update_user_admin(user_id: int, name: str, email: str, password: str, role: str, is_active: bool) -> dict | None:
     """
@@ -267,7 +267,7 @@ async def update_own_profile(user_id: int, name: str | None, email: str | None, 
     """
     # Search user info and verify password before opening transaction
     user = await search_user_by_id(user_id)
-   
+
     # Verify if the current_password is correct
     is_match = verify_password(current_password, user["password_hash"])
 
@@ -334,7 +334,7 @@ async def check_user_role(user_id: int, role: str) -> bool:
     async with engine.connect() as conn:
         query = await conn.execute(text("SELECT role FROM users WHERE id = :user_id"), {"user_id": user_id})
         results = query.mappings().one_or_none()
-    
+
         if not results:
             return False
         return results["role"] == role

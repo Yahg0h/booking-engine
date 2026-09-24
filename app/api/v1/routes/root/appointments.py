@@ -102,10 +102,10 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
             "end_at": appointment.end_at,
             "notes": appointment.notes
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Log action
         await log_action(
             organization_id=appointment.organization_id,
@@ -277,7 +277,7 @@ async def update_appointment(request: Request, id: int, appointment: Appointment
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
-    
+
     # ==== STRUCTURED LOGGING ====
     logger.info(
         f"ROOT: Appointment updated: id={id}, "
@@ -337,13 +337,13 @@ async def cancel_appointment(request: Request, id: int, user_id: int = Depends(v
         new_values = {
             "status": "CANCELLED"
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
 
         # Get organization id
         appointment_organization_id = int(appointment["organization_id"]) if appointment["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=appointment_organization_id,

@@ -131,14 +131,14 @@ async def create_owner(request: Request, user: UserCreate, user_id: int | None =
     # Check if the current user is a ROOT account
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
- 
+
     # Check if the to-be added owner email is already registered; if it is, return 409
     if await search_user_by_email(user.email):
         raise HTTPException(status_code=409, detail="Owner email is already registered.")
- 
+
     # If the current user is a ROOT account, make sure the account to be created is an owner account
     user.role = "OWNER"
- 
+
     # Add owner user account
     new_owner_id = await create_user(
         user.organization_id,
@@ -175,7 +175,7 @@ async def create_owner(request: Request, user: UserCreate, user_id: int | None =
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
-    
+
     # ==== STRUCTURED LOGGING ====
     logger.info(
         f"User owner account created: id={new_owner_id}, "
@@ -443,17 +443,17 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
         new_values = {
             "is_active": False
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get user organization_id
         user_organization_id = int(user_info["organization_id"]) if user_info["organization_id"] else None
-    
+
         # Filter sensive information out of old_values
         old_values = sanitize_audit_values(old_values)
         new_values = sanitize_audit_values(new_values)
-    
+
         # Log action
         await log_action(
             organization_id=user_organization_id,
@@ -479,4 +479,3 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
         }
 
         return success_dict
-        

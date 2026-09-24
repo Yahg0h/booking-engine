@@ -168,7 +168,7 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
         if org_data.slug is not None: new_values["slug"] = org_data.slug
         if org_data.min_work_time is not None: new_values["min_work_time"] = org_data.min_work_time
         if org_data.max_work_time is not None: new_values["max_work_time"] = org_data.max_work_time
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
 
@@ -281,7 +281,7 @@ async def update_org_settings(request: Request, id: int, settings: OrganizationS
 
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Log action
         await log_action(
             organization_id=id,
@@ -295,7 +295,7 @@ async def update_org_settings(request: Request, id: int, settings: OrganizationS
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
-        
+
         # ==== STRUCTURED LOGGING ====
         # Log
         logger.info(

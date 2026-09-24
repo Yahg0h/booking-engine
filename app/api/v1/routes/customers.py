@@ -64,10 +64,10 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
             "phone": customer.phone,
             "is_active": customer.is_active
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Log action
         await log_action(
             organization_id=customer.organization_id,
@@ -158,7 +158,7 @@ async def get_customer(request: Request, id: int, user_id: int = Depends(verify_
     # If it isn't a owner + owner + staff, return 403
     if not await check_customer_access(user_id, customer["organization_id"], allow_staff=True):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
 
     # Else, return the customer info
     return customer
@@ -183,7 +183,7 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
     """
     # Check if the customer exists
     customer = await search_customer_by_id(id)
-    
+
     # If not found, return 404
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found or doesn't exist.")
@@ -204,13 +204,13 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
         if customer_update.email is not None: new_values["email"] = customer_update.email
         if customer_update.phone is not None: new_values["phone"] = customer_update.phone
         if customer_update.is_active is not None: new_values["is_active"] = customer_update.is_active
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get organization id
         customer_organization_id = int(customer["organization_id"]) if customer["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=customer_organization_id,
@@ -274,13 +274,13 @@ async def delete_customer(request: Request, id: int, user_id: int = Depends(veri
         new_values = {
             "is_active": False
         }
-    
+
         # Get IP Address
         ip_address = get_ip_from_request(request)
-    
+
         # Get organization id
         customer_organization_id = int(customer["organization_id"]) if customer["organization_id"] else None
-    
+
         # Log action
         await log_action(
             organization_id=customer_organization_id,

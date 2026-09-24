@@ -62,4 +62,3 @@ async def update_organization_settings(org_id: int, operating_weekdays: list[int
         updated_org_settings = retrieve_query.mappings().one_or_none()
 
     return updated_org_settings
-
