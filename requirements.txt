@@ -1,7 +1,7 @@
 # Base stack
 fastapi
 uvicorn[standard]
-sqlalchemy
+sqlalchemy[asyncio]
 aiomysql
 cryptography
 pydantic
