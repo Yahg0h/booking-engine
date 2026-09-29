@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import HTTPBearer
 from slowapi.errors import RateLimitExceeded
 
+from app.api.v1.middleware.idempotency import IdempotencyMiddleware
 from app.config import settings
 from app.database import check_database_connection
 from app.logging_config import setup_logging
@@ -26,6 +27,9 @@ app = FastAPI(
     version="1.0.0",
     debug=settings.DEBUG
 )
+
+# Register idempotency middleware
+app.add_middleware(IdempotencyMiddleware)
 
 # Initialize HTTP Bearer
 security = HTTPBearer()
