@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # ==== EXTERNAL APIs ====
     REDIS_SECRET_KEY: str
-    CACHE_DEFAULT_TTL: int
+    CACHE_DEFAULT_TTL: int = 1800 # 30 mins
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
