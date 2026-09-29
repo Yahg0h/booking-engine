@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.api.v1.schemas.schemas import CustomerCreate, CustomerUpdate
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
+from app.api.v1.services.cache_service import cached
 from app.api.v1.services.customer_service import (
     change_customer_is_active,
     check_customer_access,
@@ -95,6 +96,7 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
 
 @router.get("/customers", status_code=200)
 @limiter.limit("50/minute")
+@cached(ttl=180)
 async def list_customers(request: Request, organization_id: int,
                          email: str | None = None,
                          phone: str | None = None,
@@ -134,6 +136,7 @@ async def list_customers(request: Request, organization_id: int,
 
 @router.get("/customers/{id}", status_code=200)
 @limiter.limit("50/minute")
+@cached(ttl=180)
 async def get_customer(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Retrieves information about a specific customer by ID.
