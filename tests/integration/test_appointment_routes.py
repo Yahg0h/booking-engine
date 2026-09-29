@@ -142,7 +142,7 @@ async def test_create_appointment_success(client):
     setup = await setup_appointment_prerequisites(client, root_headers)
 
     # Next Monday at 10:00 AM
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     days_ahead = (7 - now.weekday()) % 7 + 7  # ensure next week
     target_date = (now + timedelta(days=days_ahead)).replace(hour=10, minute=0, second=0, microsecond=0)
 
@@ -155,7 +155,7 @@ async def test_create_appointment_success(client):
             "customer_id": setup["cust_id"],
             "professional_id": setup["prof_id"],
             "procedure_id": setup["proc_id"],
-            "start_at": target_date.strftime("%Y-%m-%dT%H:%M:%S"),
+            "start_at": target_date.isoformat(),
             "status": "SCHEDULED",
             "notes": "First appointment test",
         }, headers=setup["owner_headers"])
@@ -191,7 +191,9 @@ async def test_create_appointment_past_date_returns_422(client):
     root_headers = await api_login_headers(client, root["email"], root["password"])
     setup = await setup_appointment_prerequisites(client, root_headers)
 
-    past_date = (datetime.now() - timedelta(days=5)).strftime("%Y-%m-%dT10:00:00")
+    past_date = (datetime.now(timezone.utc) - timedelta(days=5)).replace(
+        hour=10, minute=0, second=0, microsecond=0
+    ).isoformat()
 
     with (
         patch.object(appointments_route, "search_procedure_by_id", new=search_procedure_as_dict),

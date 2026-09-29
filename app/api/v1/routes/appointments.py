@@ -59,11 +59,19 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
         raise HTTPException(status_code=404, detail="Organization, procedure or professional not found. Please retry.")
 
     # Verify if the date input is lesser than today
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
+    appointment_start = appointment.start_at
+    if appointment_start.tzinfo is None:
+        appointment_start = appointment_start.replace(tzinfo=timezone.utc)
+    else:
+        appointment_start = appointment_start.astimezone(timezone.utc)
 
     # If it is, raise 422
-    if appointment.start_at and appointment.start_at < now:
+    if appointment_start < now:
         raise HTTPException(status_code=422, detail="The appointment date must be from today onwards.")
+
+    # Availability slots and MySQL DATETIME values are represented as UTC-naive.
+    appointment_start = appointment_start.replace(tzinfo=None)
 
     # Check access
     if not await check_appointment_access(user_id, appointment.organization_id):
@@ -75,7 +83,7 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
                                                           appointment.customer_id,
                                                           appointment.professional_id,
                                                           appointment.procedure_id,
-                                                          appointment.start_at,
+                                                          appointment_start,
                                                           appointment.status,
                                                           appointment.end_at,
                                                           appointment.notes)

@@ -7,6 +7,7 @@ Engine leak resolvido com pool_size=1 + NullPool no app durante testes.
 """
 
 import uuid
+import re
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -16,6 +17,24 @@ from app.api.v1.services.auth_service import create_jwt_token
 
 ROOT_EMAIL = "root_test_fixed@bookingengine.com"
 ROOT_PASS  = "rootpass_fixed_123"
+
+IDEMPOTENCY_REQUIRED_ROUTES = (
+    re.compile(r"^/v1/appointments$"),
+    re.compile(r"^/v1/customers$"),
+    re.compile(r"^/v1/professionals/\d+/blackouts$"),
+    re.compile(r"^/v1/professionals/\d+/procedures$"),
+    re.compile(r"^/v1/appointments/\d+$"),
+    re.compile(r"^/v1/customers/\d+$"),
+    re.compile(r"^/v1/organizations/\d+/settings$"),
+)
+
+
+async def _add_idempotency_key(request):
+    if request.method not in {"POST", "PATCH"}:
+        return
+
+    if any(pattern.fullmatch(request.url.path) for pattern in IDEMPOTENCY_REQUIRED_ROUTES):
+        request.headers.setdefault("Idempotent-Key", str(uuid.uuid4()))
 
 
 # ==========================================
@@ -82,7 +101,11 @@ async def client():
 
     from app.main import app
     app.state.limiter._storage.reset()
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        event_hooks={"request": [_add_idempotency_key]},
+    ) as ac:
         yield ac
 
     # Restaura engine original e fecha o de teste
