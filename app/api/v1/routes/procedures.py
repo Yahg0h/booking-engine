@@ -13,6 +13,7 @@ from app.api.v1.services.auth_service import (
     get_current_user_optional,
     verify_user_token,
 )
+from app.api.v1.services.cache_service import cached
 from app.api.v1.services.organization_service import search_organization_by_id
 from app.api.v1.services.procedure_service import (
     change_procedure_is_active,
@@ -98,6 +99,7 @@ async def create_procedure_route(request: Request, procedure: ProcedureCreate, u
 # READ all procedures offered by a organization (public route)
 @router.get("/procedures/organization/{id}", status_code=200)
 @limiter.limit("30/minute")
+@cached()
 async def get_procedures_by_organization(request: Request, id: int, is_active: bool = True, user_id: int = Depends(get_current_user_optional)):
     """
     Lists all procedures offered by an organization.
@@ -129,6 +131,7 @@ async def get_procedures_by_organization(request: Request, id: int, is_active: b
 # READ the information of a procedure (public route)
 @router.get("/procedures/{id}", status_code=200)
 @limiter.limit("30/minute")
+@cached()
 async def get_procedure(request: Request, id: int, user_id: int = Depends(get_current_user_optional)):
     """
     Retrieves information about a specific procedure by ID.

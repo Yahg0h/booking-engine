@@ -14,6 +14,7 @@ from app.api.v1.schemas.schemas import (
 )
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
+from app.api.v1.services.cache_service import cached
 from app.api.v1.services.organization_service import (
     check_organization_access,
     create_organization,
@@ -99,6 +100,7 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
 # READ a organizations info (root and org owner account only)
 @router.get("/organizations/{id}", status_code=200)
 @limiter.limit("50/minute")
+@cached()
 async def get_organization(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
     """
     Retrieves the details of a specific organization.
@@ -209,6 +211,7 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
 # ==========================================
 @router.get("/organizations/{id}/settings", status_code=200)
 @limiter.limit("50/minute")
+@cached()
 async def get_org_settings(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Retrieves the settings for a specific organization.

@@ -16,6 +16,7 @@ from app.api.v1.services.audit_service import (
     sanitize_audit_values,
 )
 from app.api.v1.services.auth_service import verify_user_token
+from app.api.v1.services.cache_service import cached
 from app.api.v1.services.permission_service import is_root
 from app.api.v1.services.user_service import (
     change_user_is_active,
@@ -191,6 +192,7 @@ async def create_owner(request: Request, user: UserCreate, user_id: int | None =
 # READ users information (all users for ROOT, all users in organization for OWNER)
 @router.get("/users", status_code=200)
 @limiter.limit("50/minute")
+@cached(ttl=180)
 async def get_users(request: Request, role: str | None = None, is_active: bool | None = None, user_id: int | None = Depends(verify_user_token)):
     """
     Lists users based on the provided filters.
@@ -221,6 +223,7 @@ async def get_users(request: Request, role: str | None = None, is_active: bool |
 # Read a specific user information
 @router.get("/users/{id}", status_code=200)
 @limiter.limit("50/minute")
+@cached(ttl=180)
 async def get_user(request: Request, id: int, user_id: int | None = Depends(verify_user_token)):
     """
     Retrieves information about a specific user by ID.

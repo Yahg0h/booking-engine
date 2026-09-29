@@ -1,6 +1,14 @@
 """
-Redis-backed helpers used to coordinate booking locks.
+Redis-backed helpers used to coordinate booking locks and manage caching.
 """
+
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+from functools import wraps
+from typing import Any
 
 import redis
 
@@ -13,6 +21,11 @@ redis_client = redis.Redis(
     decode_responses=True
 )
 
+# Default cache TTL from enviroment (in secs)
+DEFAULT_CACHE_TTL = int(settings.CACHE_DEFAULT_TTL) if hasattr(settings, 'CACHE_DEFAULT_TTL') else 1800
+HIGH_FREQUENCY_TTL = 5
+
+# ==== LOCK FUNCTIONS ====
 def acquire_lock(key: str, timeout: int) -> bool:
     """
     Acquires a distributed lock for a cache key.
@@ -34,3 +47,143 @@ def release_lock(key: str) -> None:
         key: The lock key to remove from Redis
     """
     redis_client.delete(key)
+
+# ==== CACHE FUNCTIONS ====
+def cached(ttl: int | None = None):
+    """
+    Decorator to cache GET responses.
+    
+    Args:
+        ttl: Time-to-live in seconds (if None, uses default DEFAULT_CACHE_TTL)
+    """
+    if ttl is None:
+        ttl = DEFAULT_CACHE_TTL
+
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Constructs a unique key (org_id + function + args)
+            cache_key = f"cache:{func.__name__}:{args}:{kwargs}"
+            
+            # Try to get from cache
+            cached_data = get_cached(cache_key)
+            if cached_data is not None:
+                return cached_data
+            
+            # If it doesn't exist, execute the function
+            result = await func(*args, **kwargs)
+            
+            # Stores in the cache
+            set_cached(cache_key, result, ttl)
+            return result
+        
+        return wrapper
+    return decorator
+
+def get_cached(key: str) -> dict | None:
+    """
+    Retrieves a cached value from Redis.
+    
+    Args:
+        key: The cache key
+    
+    Returns:
+        dict | None: Deserialized JSON or None if not found
+    """
+    # Get the key's raw value
+    raw_value = redis_client.get(key)
+
+    # If the key doesn't exist, return None
+    if raw_value is None:
+        return None
+
+    # Deserializes the JSON string back into a Python dictionary.
+    try:
+        return json.loads(raw_value)
+    except json.JSONDecodeError as e:
+        # ==== STRUCTURED LOGGING ====
+        logger.warning(
+            f"Failed to deserialize JSON from cache key '{key}', "
+            f"Value might be corrupted. Error {e!s}."
+        )
+        return None
+
+def set_cached(key: str, value: Any, ttl: int | None) -> None:
+    """
+    Stores a value in Redis cache.
+    
+    Args:
+        key: The cache key
+        value: Data to cache (will be JSON serialized)
+        ttl: Time-to-live in seconds (default uses DEFAULT_CACHE_TTL)
+    """
+    if ttl is None:
+        ttl = DEFAULT_CACHE_TTL
+
+    try:
+        # Serialize the Python value to JSON string
+        serialized_value = json.dumps(value)
+        # Save on Redis by defining the TTL in secs
+        redis_client.set(key, serialized_value, ex=ttl)
+    except TypeError as e:
+        # If the value has data JSON doesn't accepts, return error
+        # ==== STRUCTURED LOGGING ====
+        logger.error(
+            f"Failed to deserialize JSON for cache key '{key}', "
+            f"Data type: {type(value)}. Error {e!s}."
+        )
+    except Exception as e:
+        # If any other errors occour, specially Redis ones, return error
+        # ==== STRUCTURED LOGGING ====
+        logger.error(f"Failed to write to Redis cache for key '{key}'. Error: {e!s}")
+
+def delete_cached(key: str) -> None:
+    """
+    Deletes a cached value.
+
+    Args:
+        key: The cache key
+    """
+    redis_client.delete(key)
+
+def invalidate_pattern(pattern: str) -> int:
+    """
+    Invalidates all cache keys matching a pattern.
+    
+    Args:
+        pattern: Redis key pattern (e.g., "cache:procedures:*")
+    
+    Returns:
+        int: Number of keys deleted
+    """
+    total_deleted = 0
+    batch = []
+    # Recommended batch size to balance memory and network usage
+    BATCH_SIZE = 500
+
+    try:
+        # Check Redis in a iterative way looking for the pattern input
+        for key in redis_client.scan_iter(match=pattern):
+            batch.append(key)
+
+            # When the batch hits the max limit, delete, then clean the batch list
+            if len(batch) >= BATCH_SIZE:
+                deleted_count = redis_client.delete(*batch)
+                total_deleted += deleted_count
+                batch = []
+
+        # Delete the remaining keys that werent enough to fill a full batch
+        if batch:
+            deleted_count = redis_client.delete(*batch)
+            total_deleted += deleted_count
+
+    except Exception as e:
+        # Log error and let the data expire by the defined TTL
+        # ==== STRUCTURED LOGGING ====
+        logger.error(
+            f"Error while invalidating cache pattern '{pattern}', "
+            f"Keys deleted before failure: {total_deleted}. Error {e!s}."
+        )
+
+    # Else, return total of keys deleted
+    return total_deleted

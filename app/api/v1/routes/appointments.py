@@ -20,6 +20,7 @@ from app.api.v1.services.appointment_service import (
 )
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
+from app.api.v1.services.cache_service import cached
 from app.api.v1.services.customer_service import update_customer_last_appointment
 from app.api.v1.services.organization_service import search_organization_by_id
 from app.api.v1.services.organization_settings_service import get_organization_settings
@@ -137,6 +138,7 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
 
 @router.get("/appointments", status_code=200)
 @limiter.limit("50/minute")
+@cached(ttl=5)
 async def list_appointments(request: Request, organization_id: int,
                             customer_id: int | None = None,
                             professional_id: int | None = None,
@@ -176,6 +178,7 @@ async def list_appointments(request: Request, organization_id: int,
 
 @router.get("/appointments/{id}", status_code=200)
 @limiter.limit("50/minute")
+@cached(ttl=5)
 async def get_appointment(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Retrieves information about a specific appointment by ID.

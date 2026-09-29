@@ -22,6 +22,7 @@ from app.api.v1.services.auth_service import (
     get_current_user_optional,
     verify_user_token,
 )
+from app.api.v1.services.cache_service import cached
 from app.api.v1.services.organization_service import search_organization_by_id
 from app.api.v1.services.organization_settings_service import get_organization_settings
 from app.api.v1.services.permission_service import is_root
@@ -128,6 +129,7 @@ async def create_professional_route(request: Request, professional: Professional
 # READ all professionals in a organization
 @router.get("/professionals", status_code=200)
 @limiter.limit("30/minute")
+@cached(ttl=180)
 async def get_professionals(request: Request, organization_id: int, is_active: bool = True, user_id: int = Depends(verify_user_token)):
     """
     Lists all professionals in an organization.
@@ -156,6 +158,7 @@ async def get_professionals(request: Request, organization_id: int, is_active: b
 # READ all professionals registered across all registered organizations (root-only)
 @router.get("/professionals/all", status_code=200)
 @limiter.limit("30/minute")
+@cached(ttl=180)
 async def get_all_professionals(request: Request, is_active: bool = True, user_id: int = Depends(verify_user_token)):
     """
     Lists all professionals registered across all organizations (root-only).
@@ -183,6 +186,7 @@ async def get_all_professionals(request: Request, is_active: bool = True, user_i
 # READ information of a specific professional (public route)
 @router.get("/professionals/{id}", status_code=200)
 @limiter.limit("30/minute")
+@cached(ttl=180)
 async def get_professional(request: Request, id: int, user_id: int = Depends(get_current_user_optional)):
     """
     Retrieves public information of a specific professional.
@@ -621,6 +625,7 @@ async def update_working_hour(request: Request, professional_id: int, id: int, w
 # CREATE a blackout (professional-only)
 @router.post("/professionals/{id}/blackouts", status_code=201)
 @limiter.limit("30/minute")
+@cached(ttl=5)
 async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, user_id: int = Depends(verify_user_token)):
     """
     Creates a blackout for a professional.
@@ -739,6 +744,7 @@ async def get_blackouts_by_professional(request: Request, id: int, user_id: int 
 # READ a blackout of id 'id'
 @router.get("/professionals/blackouts/{id}", status_code=200)
 @limiter.limit("30/minute")
+@cached(ttl=5)
 async def get_blackout(request: Request, id: int, user_id: int = Depends(verify_user_token)):
     """
     Retrieves information about a specific blackout.
