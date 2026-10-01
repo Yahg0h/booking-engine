@@ -7,10 +7,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from datetime import date, datetime
+from decimal import Decimal
 from functools import wraps
 from typing import Any
 
+import pandas as pd
 import redis
+from fastapi import Request
 
 from app.config import settings
 
@@ -24,6 +28,23 @@ redis_client = redis.Redis(
 # Default cache TTL from enviroment (in secs)
 DEFAULT_CACHE_TTL = int(settings.CACHE_DEFAULT_TTL) if hasattr(settings, 'CACHE_DEFAULT_TTL') else 1800
 HIGH_FREQUENCY_TTL = 5
+
+def json_serializer(obj: Any) -> Any:
+    """Helper serializer for `json.dumps` to handle datetime, decimal, and pandas objects."""
+    # Handles native date/time objects and Pandas Timestamps.
+    if isinstance(obj, (datetime, date, pd.Timestamp)):
+        return obj.isoformat()
+    # Handles Decimal objects (financial/monetary values)
+    if isinstance(obj, Decimal):
+        return float(obj)
+    # Handles Pandas DataFrames by converting them into a list of dictionaries.
+    if isinstance(obj, pd.DataFrame):
+        return obj.to_dict(orient="records")
+    # Handle Pandas Series by converting them to a list.
+    if isinstance(obj, pd.Series):
+        return obj.tolist()
+    
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 # ==== LOCK FUNCTIONS ====
 def acquire_lock(key: str, timeout: int) -> bool:
@@ -51,8 +72,8 @@ def release_lock(key: str) -> None:
 # ==== CACHE FUNCTIONS ====
 def cached(ttl: int | None = None):
     """
-    Decorator to cache GET responses.
-    
+    Decorator to cache GET responses/functions automatically.
+
     Args:
         ttl: Time-to-live in seconds (if None, uses default DEFAULT_CACHE_TTL)
     """
@@ -62,21 +83,29 @@ def cached(ttl: int | None = None):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Constructs a unique key (org_id + function + args)
-            cache_key = f"cache:{func.__name__}:{args}:{kwargs}"
+            # Ignore FastAPI infrastructure objects, but keep user_id to isolate
+            # cached responses between users with different authorization scopes.
+            cache_kwargs = {
+                k: v.isoformat() if isinstance(v, (datetime, date)) else v
+                for k, v in kwargs.items()
+                if not isinstance(v, Request)
+            }
             
-            # Try to get from cache
+            # Sets up a clean and predictable key.
+            cache_key = f"cache:{func.__name__}:{cache_kwargs}"
+
+            # Try looking in the cache
             cached_data = get_cached(cache_key)
             if cached_data is not None:
                 return cached_data
-            
-            # If it doesn't exist, execute the function
+
+            # If it does not exist in the cache, execute the route normally.
             result = await func(*args, **kwargs)
-            
-            # Stores in the cache
+
+            # Saves to cache using the filtered key.
             set_cached(cache_key, result, ttl)
             return result
-        
+
         return wrapper
     return decorator
 
@@ -122,14 +151,14 @@ def set_cached(key: str, value: Any, ttl: int | None) -> None:
 
     try:
         # Serialize the Python value to JSON string
-        serialized_value = json.dumps(value)
+        serialized_value = json.dumps(value, default=json_serializer)
         # Save on Redis by defining the TTL in secs
         redis_client.set(key, serialized_value, ex=ttl)
     except TypeError as e:
         # If the value has data JSON doesn't accepts, return error
         # ==== STRUCTURED LOGGING ====
         logger.error(
-            f"Failed to deserialize JSON for cache key '{key}', "
+            f"Failed to serialize JSON for cache key '{key}', "
             f"Data type: {type(value)}. Error {e!s}."
         )
     except Exception as e:

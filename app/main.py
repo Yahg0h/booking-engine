@@ -66,6 +66,7 @@ from app.api.v1.routes.root.customers import router as root_customers
 from app.api.v1.routes.root.organizations import router as root_organizations
 from app.api.v1.routes.root.procedures import router as root_procedures
 from app.api.v1.routes.root.professionals import router as root_professionals
+from app.api.v1.routes.root.reports import router as root_reports
 from app.api.v1.routes.root.statistics import router as root_statistics
 from app.api.v1.routes.root.users import router as root_users
 from app.api.v1.routes.users import router as users_router
@@ -150,3 +151,4 @@ app.include_router(root_procedures)
 app.include_router(root_customers)
 app.include_router(root_appointments)
 app.include_router(root_statistics)
+app.include_router(root_reports)
