@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from app.api.v1.schemas.schemas import (
     OrganizationCreate,
@@ -29,6 +30,15 @@ from app.api.v1.services.organization_settings_service import (
     update_organization_settings,
 )
 from app.api.v1.services.permission_service import is_root
+from app.api.v1.services.report_generator import (
+    generate_csv_report,
+    generate_pdf_report,
+)
+from app.api.v1.services.report_service import (
+    generate_appointments_report,
+    generate_customers_report,
+    generate_revenue_report,
+)
 from app.api.v1.services.statistics_service import (
     get_appointments_statistics,
     get_customers_statistics,
@@ -463,3 +473,153 @@ async def customer_statistics(request: Request, id: int, start_date: datetime | 
     set_cached(cache_key, result_to_cache, ttl=900)
 
     return customers_stats
+
+# ==========================================
+# ORGANIZATION REPORTING ROUTES
+# ==========================================
+@router.get("/organizations/{id}/reports/appointments", status_code=200)
+@limiter.limit("2/minute")
+async def organization_appointments_report(
+    request: Request,
+    id: int,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    professional_id: int | None = None,
+    customer_id: int | None = None,
+    format: str = "pdf",
+    user_id: int = Depends(verify_user_token)
+):
+    # Check if the organization exists
+    is_real = await search_organization_by_id(id)
+
+    if not is_real:
+        raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
+
+    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
+    if not await check_organization_access(user_id, is_real["id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+    
+    report_data = await generate_appointments_report(
+        org_id=id,
+        start_date=start_date,
+        end_date=end_date,
+        professional_id=professional_id,
+        customer_id=customer_id
+    )
+
+    # Manual caching
+    cache_key = f"cache:org_report_appointments:{start_date}:{end_date}:{professional_id}:{customer_id}"
+    set_cached(cache_key, report_data, ttl=300)
+    
+    if format == "pdf":
+        pdf_buffer = generate_pdf_report(report_data)
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=appointments_report.pdf"}
+        )
+    else:
+        csv_buffer = generate_csv_report(report_data)
+        return StreamingResponse(
+            csv_buffer,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=appointments_report.csv"}
+        )
+
+
+@router.get("/organizations/{id}/reports/revenue", status_code=200)
+@limiter.limit("2/minute")
+async def organization_revenue_report(
+    request: Request,
+    id: int,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    professional_id: int | None = None,
+    group_by: str = "month",
+    format: str = "pdf",
+    user_id: int = Depends(verify_user_token)
+):
+    # Check if the organization exists
+    is_real = await search_organization_by_id(id)
+
+    if not is_real:
+        raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
+
+    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
+    if not await check_organization_access(user_id, is_real["id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+    
+    report_data = await generate_revenue_report(
+        org_id=id,
+        start_date=start_date,
+        end_date=end_date,
+        professional_id=professional_id,
+        group_by=group_by
+    )
+
+    # Manual caching
+    cache_key = f"cache:org_report_revenue:{start_date}:{end_date}:{professional_id}:{group_by}"
+    set_cached(cache_key, report_data, ttl=300)
+    
+    if format == "pdf":
+        pdf_buffer = generate_pdf_report(report_data)
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=revenue_report.pdf"}
+        )
+    else:
+        csv_buffer = generate_csv_report(report_data)
+        return StreamingResponse(
+            csv_buffer,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=revenue_report.csv"}
+        )
+
+
+@router.get("/organizations/{id}/reports/customers", status_code=200)
+@limiter.limit("2/minute")
+async def organization_customers_report(
+    request: Request,
+    id: int,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    professional_id: int | None = None,
+    format: str = "pdf",
+    user_id: int = Depends(verify_user_token)
+):
+    # Check if the organization exists
+    is_real = await search_organization_by_id(id)
+
+    if not is_real:
+        raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
+
+    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
+    if not await check_organization_access(user_id, is_real["id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+    
+    report_data = await generate_customers_report(
+        org_id=id,
+        start_date=start_date,
+        end_date=end_date,
+        professional_id=professional_id
+    )
+
+    # Manual caching
+    cache_key = f"cache:org_report_customers:{start_date}:{end_date}:{professional_id}"
+    set_cached(cache_key, report_data, ttl=300)
+    
+    if format == "pdf":
+        pdf_buffer = generate_pdf_report(report_data)
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=customers_report.pdf"}
+        )
+    else:
+        csv_buffer = generate_csv_report(report_data)
+        return StreamingResponse(
+            csv_buffer,
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=customers_report.csv"}
+        )
