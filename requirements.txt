@@ -21,3 +21,5 @@ python-json-logger
 pytest
 pytest-asyncio
 httpx
+
+pandas

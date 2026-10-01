@@ -5,6 +5,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.api.v1.schemas.schemas import (
@@ -14,7 +16,7 @@ from app.api.v1.schemas.schemas import (
 )
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
-from app.api.v1.services.cache_service import cached
+from app.api.v1.services.cache_service import cached, set_cached
 from app.api.v1.services.organization_service import (
     check_organization_access,
     create_organization,
@@ -27,6 +29,11 @@ from app.api.v1.services.organization_settings_service import (
     update_organization_settings,
 )
 from app.api.v1.services.permission_service import is_root
+from app.api.v1.services.statistics_service import (
+    get_appointments_statistics,
+    get_customers_statistics,
+    get_revenue_statistics,
+)
 from app.rate_limiter import limiter
 
 # Configure router
@@ -308,3 +315,151 @@ async def update_org_settings(request: Request, id: int, settings: OrganizationS
         )
 
     return is_updated
+
+# ==========================================
+# ORGANIZATION STATISTICS ROUTES
+# ==========================================
+@router.get("/organizations/{id}/statistics/appointments", status_code=200)
+@limiter.limit("5/minute")
+async def appointment_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves and caches appointment statistics for a specific organization.
+
+    Args:
+        request: The FastAPI request used by the rate limiter
+        id: The ID of the organization to report on
+        start_date: The beginning of the reporting period (optional)
+        end_date: The end of the reporting period (optional)
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: Appointment totals, cancellation and no-show counts and rates, and the reporting period
+
+    Raises:
+        HTTPException: If the organization does not exist or the user lacks access
+
+    Notes:
+        A serialized copy of the result is cached for 15 minutes
+    """
+    # Check if the organization exists
+    is_real = await search_organization_by_id(id)
+
+    if not is_real:
+        raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
+
+    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
+    if not await check_organization_access(user_id, is_real["id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+    
+    # Get appointments statistics for the organization
+    appts_stats = await get_appointments_statistics(id, start_date, end_date)
+
+    # Manual caching (converts datas to string)
+    cache_key = f"cache:appointment_statistics:{id}:{start_date}:{end_date}"
+    result_to_cache = {
+        **appts_stats,
+        "period": {
+            "start_date": appts_stats["period"]["start_date"].isoformat(),
+            "end_date": appts_stats["period"]["end_date"].isoformat()
+        }
+    }
+    set_cached(cache_key, result_to_cache, ttl=900)
+
+    return appts_stats
+
+@router.get("/organizations/{id}/statistics/revenue", status_code=200)
+@limiter.limit("5/minute")
+async def revenue_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, group_by: str = 'week', user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves and caches revenue statistics for a specific organization.
+
+    Args:
+        request: The FastAPI request used by the rate limiter
+        id: The ID of the organization to report on
+        start_date: The beginning of the reporting period (optional)
+        end_date: The end of the reporting period (optional)
+        group_by: The revenue grouping interval ('week', 'month' or 'year')
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: Estimated and concrete revenue grouped by date, with the reporting period
+
+    Raises:
+        HTTPException: If the organization does not exist or the user lacks access
+
+    Notes:
+        A serialized copy of the result is cached for 10 minutes
+    """
+    # Check if the organization exists
+    is_real = await search_organization_by_id(id)
+
+    if not is_real:
+        raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
+
+    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
+    if not await check_organization_access(user_id, is_real["id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+
+    # Get the organization's revenue statistics
+    rev_stats = await get_revenue_statistics(id, start_date, end_date, group_by)
+
+    # Manual caching (converts datas to string)
+    cache_key = f"cache:revenue_statistics:{id}:{start_date}:{end_date}"
+    result_to_cache = {
+        **rev_stats,
+        "period": {
+            "start_date": rev_stats["period"]["start_date"].isoformat(),
+            "end_date": rev_stats["period"]["end_date"].isoformat()
+        }
+    }
+    set_cached(cache_key, result_to_cache, ttl=600)
+
+    return rev_stats
+
+@router.get("/organizations/{id}/statistics/customers", status_code=200)
+@limiter.limit("5/minute")
+async def customer_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, user_id: int = Depends(verify_user_token)):
+    """
+    Retrieves and caches customer statistics for a specific organization.
+
+    Args:
+        request: The FastAPI request used by the rate limiter
+        id: The ID of the organization to report on
+        start_date: The beginning of the reporting period (optional)
+        end_date: The end of the reporting period (optional)
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: Customer counts, engagement rate, per-professional counts, and reporting period
+
+    Raises:
+        HTTPException: If the organization does not exist or the user lacks access
+
+    Notes:
+        A serialized copy of the result is cached for 15 minutes
+    """
+    # Check if the organization exists
+    is_real = await search_organization_by_id(id)
+
+    if not is_real:
+        raise HTTPException(status_code=404, detail="Organization not found or doesn't exist.")
+
+    # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
+    if not await check_organization_access(user_id, is_real["id"]):
+        raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
+
+    # Get the organization's customer statistics
+    customers_stats = await get_customers_statistics(id, start_date, end_date)
+
+    # Manual caching (converts datas to string)
+    cache_key = f"cache:customer_statistics:{id}:{start_date}:{end_date}"
+    result_to_cache = {
+        **customers_stats,
+        "period": {
+            "start_date": customers_stats["period"]["start_date"].isoformat(),
+            "end_date": customers_stats["period"]["end_date"].isoformat()
+        }
+    }
+    set_cached(cache_key, result_to_cache, ttl=900)
+
+    return customers_stats

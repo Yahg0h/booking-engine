@@ -123,15 +123,38 @@ async def client():
 
 async def api_register_root(client) -> dict:
     """
-    Garante que ROOT existe com credenciais fixas.
-    Login 200  → reutiliza.
-    Login 404  → registra.
-    Login 401  → ROOT existe com senha diferente (deletar manualmente).
-    Reg   409  → ROOT existe com email diferente (deletar manualmente).
+    Garante um ROOT de teste com credenciais conhecidas.
+
+    Reutiliza a conta quando as credenciais fixas funcionam. Se a conta está
+    ausente, mas existe outro ROOT, ou se a senha da conta fixa mudou, remove
+    a conta ROOT existente e recria a conta de teste.
     """
     import jwt
+    from sqlalchemy import text
 
     from app.config import settings
+
+    async def create_test_root() -> dict:
+        reg_resp = await client.post("/v1/register", json={
+            "name": "Test Root Admin",
+            "email": ROOT_EMAIL,
+            "password": ROOT_PASS,
+            "role": "ROOT",
+            "organization_id": None,
+            "is_active": True
+        })
+        assert reg_resp.status_code == 201, f"Root registration failed: {reg_resp.text}"
+        msg = reg_resp.json()["message"]
+        user_id = int(msg.split("UserID = ")[1].split(",")[0].rstrip("."))
+        return {"id": user_id, "email": ROOT_EMAIL, "password": ROOT_PASS,
+                "role": "ROOT", "organization_id": None}
+
+    async def reset_root_accounts() -> dict:
+        import app.database as db_module
+
+        async with db_module.engine.begin() as conn:
+            await conn.execute(text("DELETE FROM users WHERE role = :role"), {"role": "ROOT"})
+        return await create_test_root()
 
     login_resp = await client.post("/v1/login", json={"email": ROOT_EMAIL, "password": ROOT_PASS})
 
@@ -152,15 +175,15 @@ async def api_register_root(client) -> dict:
             "is_active": True
         })
         if reg_resp.status_code == 409:
-            raise RuntimeError(
-                "ROOT com email diferente já existe. "
-                "Execute: DELETE FROM users WHERE role='ROOT';"
-            )
+            return await reset_root_accounts()
         assert reg_resp.status_code == 201, f"Root registration failed: {reg_resp.text}"
         msg = reg_resp.json()["message"]
         user_id = int(msg.split("UserID = ")[1].split(",")[0].rstrip("."))
         return {"id": user_id, "email": ROOT_EMAIL, "password": ROOT_PASS,
                 "role": "ROOT", "organization_id": None}
+
+    if login_resp.status_code == 401:
+        return await reset_root_accounts()
 
     raise RuntimeError(
         f"Login retornou {login_resp.status_code}: {login_resp.text}\n"
