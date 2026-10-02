@@ -33,6 +33,10 @@ Booking Engine is a backend REST API designed to manage appointment scheduling a
 - **Structured JSON logging** — supports both plain text and JSON log formats
 - **Rate limiting** — per-endpoint request throttling via SlowAPI
 - **JWT authentication** — stateless authentication with configurable expiration
+- **Idempotency keys** — ensures safe retries for critical mutations via `Idempotent-Key` header; prevents duplicate appointments, customers, and professionals
+- **Redis cache management** — multi-tier caching strategy with tiered TTLs (5s to 30min) and smart invalidation patterns
+- **Statistics & analytics endpoints** — real-time appointment, revenue, and customer metrics with date-range filtering and weekly/monthly/yearly grouping
+- **Advanced reporting** — PDF and CSV report generation with metadata, summary metrics, and detailed data export
 - **Interactive API docs** — Swagger UI available at `/docs`
 
 ---
@@ -52,6 +56,9 @@ Booking Engine is a backend REST API designed to manage appointment scheduling a
 | Settings Management | [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) |
 | Rate Limiting | [SlowAPI](https://slowapi.readthedocs.io/) |
 | Logging | [python-json-logger](https://github.com/madzak/python-json-logger) |
+| Caching & Locking | [redis-py](https://github.com/redis/redis-py) |
+| Data Analysis | [pandas](https://pandas.pydata.org/) |
+| PDF Generation | [reportlab](https://www.reportlab.com/) |
 | Testing | [pytest](https://docs.pytest.org/) + [pytest-asyncio](https://pytest-asyncio.readthedocs.io/) + [httpx](https://www.python-httpx.org/) |
 | Containerization | Docker + Docker Compose |
 | CI | GitHub Actions |
@@ -65,8 +72,19 @@ booking-engine/
 ├── app/
 │   ├── api/
 │   │   └── v1/
+│   │       ├── middleware/         # ASGI middleware
+│   │       │   ├── idempotency.py  # Idempotency enforcement and response caching
+│   │       │   └── rate_limiter.py # Shared SlowAPI limiter instance
 │   │       ├── routes/             # HTTP route handlers
 │   │       │   ├── root/           # ROOT-only admin routes
+│   │       │   │   ├── appointments.py
+│   │       │   │   ├── customers.py
+│   │       │   │   ├── organizations.py
+│   │       │   │   ├── procedures.py
+│   │       │   │   ├── professionals.py
+│   │       │   │   ├── reports.py  # PDF/CSV report generation
+│   │       │   │   ├── statistics.py # Aggregated metrics endpoints
+│   │       │   │   └── users.py
 │   │       │   ├── appointments.py
 │   │       │   ├── auth.py
 │   │       │   ├── availability.py
@@ -82,20 +100,23 @@ booking-engine/
 │   │           ├── audit_service.py
 │   │           ├── auth_service.py
 │   │           ├── availability_service.py
-│   │           ├── cache_service.py
+│   │           ├── cache_service.py       # Redis locks, caching decorator, and helpers
 │   │           ├── customer_service.py
+│   │           ├── idempotency_service.py # Redis check/store for idempotent requests
 │   │           ├── organization_service.py
 │   │           ├── organization_settings_service.py
 │   │           ├── password_service.py
 │   │           ├── permission_service.py
 │   │           ├── procedure_service.py
 │   │           ├── professional_service.py
+│   │           ├── report_generator.py    # PDF and CSV file generation
+│   │           ├── report_service.py      # Report data queries via pandas
+│   │           ├── statistics_service.py  # Statistics and metrics aggregation
 │   │           └── user_service.py
 │   ├── config.py                   # Environment settings via pydantic-settings
 │   ├── database.py                 # SQLAlchemy async engine setup
 │   ├── logging_config.py           # Structured logging configuration
-│   ├── main.py                     # FastAPI app initialization and router registration
-│   └── rate_limiter.py             # SlowAPI limiter instance
+│   └── main.py                     # FastAPI app initialization and router registration
 ├── tests/
 │   ├── integration/                # Integration tests (route-level)
 │   └── unit/
@@ -109,6 +130,7 @@ booking-engine/
 ├── requirements.txt
 ├── pytest.ini
 ├── README.md
+├── .env.example                    # Environment variable template
 └── .env                            # Environment variables (not committed)
 ```
 
@@ -212,6 +234,7 @@ ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8000
 
 # Redis
 REDIS_SECRET_KEY=your_redis_secret
+CACHE_DEFAULT_TTL=1800
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_DB=0
@@ -311,6 +334,24 @@ The pipeline performs the following steps in order:
 | **Summary** | Prints a completion message regardless of step outcomes |
 
 The test environment variables (database host, JWT secret, Redis credentials) are injected directly into the test runner step — no `.env` file is used in CI.
+
+⚠️ **Critical Warning for Testing Setup**
+
+The `api_register_root()` helper in `conftest.py:157` executes `DELETE FROM users WHERE role = 'ROOT'` to ensure tests run without duplicate ROOT account conflicts.
+
+**Risk:** If tests are run against a **production** database, **all ROOT accounts will be permanently removed**.
+
+**How ​​it works:**
+1. Attempts to log in using fixed credentials (`root_test_fixed@bookingengine.com` / `rootpass_fixed_123`)
+2. If it receives a 401 (account exists but password differs), it deletes ALL ROOT accounts and recreates the test account
+3. If it receives a 409 (email already registered), it likewise deletes all ROOT accounts and recreates the test account
+
+**How ​​to protect yourself:**
+- Use `.env.test` or a `DATABASE_URL` variable pointing exclusively to a **test** database
+- Never run `pytest` against production connections
+- If accidentally run in production:
+  - Delete the account created by the test (`root_test_fixed@bookingengine.com`)
+  - Recover the password/email for the original ROOT account
 
 ---
 
@@ -442,6 +483,37 @@ Query parameters: `organization_id`, `professional_id`, `procedure_id`, `date`
 
 ---
 
+### Statistics *(ROOT only)*
+
+All statistics routes are prefixed with `/v1/root` and results are cached in Redis.
+
+| Method | Endpoint | Description | Cache TTL |
+|---|---|---|---|
+| `GET` | `/v1/root/statistics/appointments/global` | Appointment metrics across all organizations | 5 min |
+| `GET` | `/v1/root/statistics/revenue/global` | Revenue metrics across all organizations | 10 min |
+| `GET` | `/v1/root/statistics/customers/global` | Customer metrics across all organizations | 15 min |
+| `GET` | `/v1/root/statistics/appointments/{organization_id}` | Appointment metrics for one organization | 5 min |
+| `GET` | `/v1/root/statistics/revenue/{organization_id}` | Revenue metrics for one organization | 10 min |
+| `GET` | `/v1/root/statistics/customers/{organization_id}` | Customer metrics for one organization | 15 min |
+
+Query parameters: `start_date`, `end_date` (all); `group_by=week\|month\|year` (revenue only)
+
+---
+
+### Reports *(ROOT only)*
+
+All report routes are prefixed with `/v1/root` and return a streaming `application/pdf` or `text/csv` file.
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/v1/root/reports/appointments/global` | Download global appointments report |
+| `GET` | `/v1/root/reports/revenue/global` | Download global revenue report |
+| `GET` | `/v1/root/reports/customers/global` | Download global customers report |
+
+Query parameters: `format=pdf\|csv`, `start_date`, `end_date`, `professional_id`, `customer_id` (appointments/customers), `group_by` (revenue)
+
+---
+
 ## Architecture
 
 ### How Routes Handle HTTP Errors
@@ -478,7 +550,7 @@ Examples of responsibilities:
 - **`appointment_service`** — Acquires a Redis distributed lock before checking availability, preventing race conditions when two requests target the same slot simultaneously.
 - **`audit_service`** — Records every state mutation to `audit_logs`, including actor identity, old and new values, and the requesting IP address.
 - **`permission_service`** — Provides reusable helpers (`is_root`, `is_owner`) consumed by routes to enforce RBAC.
-- **`cache_service`** — Wraps Redis `SET NX EX` to implement distributed advisory locks (`acquire_lock` / `release_lock`).
+- **`cache_service`** — Redis utility layer. Provides distributed advisory locks (`acquire_lock` / `release_lock`) via `SET NX EX`, a `@cached(ttl)` decorator for GET route caching, manual `get_cached` / `set_cached` / `delete_cached` helpers, and a batch `invalidate_pattern` function. Includes a custom JSON serializer that handles `datetime`, `Decimal`, pandas `DataFrame` and `Series` objects.
 
 ---
 
@@ -580,6 +652,301 @@ Applies a configurable buffer time (`buffer_time_minutes`) to manage setup/teard
 - **Transition time**: Moving between clients, mental reset
 - **Prevents back-to-back exhaustion**: Staff has breathing room
 - **Reduces no-shows**: Realistic scheduling improves reliability
+
+---
+
+### Idempotency Keys
+
+Ensures safe retries for critical write operations. The `Idempotent-Key` header (UUID v4) must be included in POST and PATCH requests to prevent duplicate records.
+
+**Critical routes** requiring idempotency:
+- `POST /v1/appointments`
+- `POST /v1/customers`
+- `POST /v1/professionals/{id}/blackouts`
+- `POST /v1/professionals/{id}/procedures`
+- `PATCH /v1/appointments/{id}`
+- `PATCH /v1/customers/{id}`
+- `PATCH /v1/organizations/{id}/settings`
+
+**Example usage**:
+
+```bash
+curl -X POST http://localhost:8000/v1/appointments \
+  -H "Authorization: Bearer <token>" \
+  -H "Idempotent-Key: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "professional_id": 1,
+    "customer_id": 2,
+    "procedure_id": 3,
+    "start_at": "2025-01-15T10:00:00Z"
+  }'
+```
+
+**Implementation**:
+- Middleware captures request body, extracts `Idempotent-Key`, and checks Redis cache
+- Cache key format: `idempotency:{org_id}:{idempotency_key}`
+- TTL: 5 minutes (300 seconds)
+- Returns cached response if key exists; stores full response (success or error) after first execution
+- Non-critical routes ignore missing headers; critical routes return `400 Bad Request`
+
+---
+
+### Redis Cache Management
+
+Multi-tier caching strategy with smart invalidation to reduce database load while maintaining data freshness.
+
+**Tiered TTL strategy**:
+
+| Data Type | TTL | Use Case |
+|-----------|-----|----------|
+| Appointments, Availability, Blackouts | 5 seconds | Real-time data |
+| Customers, Professionals, Users | 3 minutes | Moderate change frequency |
+| Procedures, Org Settings | 30 minutes | Stable configuration |
+
+**Cache key patterns**:
+- `org:{org_id}:appointments:*`
+- `org:{org_id}:professionals:*`
+- `org:{org_id}:availability:prof:{prof_id}:*`
+- `org:{org_id}:customers:{cust_id}:*`
+
+**Invalidation matrix** (automatic on mutations):
+
+| Resource | Invalidates |
+|----------|-------------|
+| Procedure | `org:{id}:procedures:*`, `org:{id}:availability:*` |
+| Professional | `org:{id}:professionals:*`, `org:{id}:availability:prof:{prof_id}:*` |
+| Appointment | `org:{id}:availability:prof:{prof_id}:*`, `org:{id}:appointments:customer:{cust_id}:*` |
+| Working Hours / Blackouts | `org:{id}:availability:prof:{prof_id}:*` |
+
+**Cache configuration** (`.env`):
+
+```env
+# Cache TTL in seconds (default: 1800)
+CACHE_DEFAULT_TTL=1800
+
+# Redis connection
+REDIS_URL=redis://localhost:6379/0
+```
+
+**Cached endpoints** use `@cached(ttl=...)` decorator on GET routes:
+
+```python
+@router.get("/v1/organizations/{org_id}/appointments")
+@cached(ttl=300)  # 5 minutes
+async def list_appointments(org_id: int, ...):
+    ...
+```
+
+**Custom JSON serializer** supports:
+- `datetime`, `date` objects
+- pandas `Timestamp`, `Decimal`, `DataFrame`, `Series`
+- Automatic conversion during cache write/read
+
+> The report routes (`routes/root/reports.py` at the root level and `organizations.py` at the organization level) use manual caching with `set-cached` instead of the decorator.
+
+---
+
+### Statistics & Analytics Endpoints
+
+Real-time metrics aggregation for appointments, revenue, and customers with flexible date-range filtering.
+
+**Available metrics**:
+
+| Metric | Scope | Dimensions |
+|--------|-------|-----------|
+| Appointments | Org / Global | total, completed, cancelled, no_show, rates |
+| Revenue | Org / Global | estimated (all), concrete (completed), grouped by week/month/year |
+| Customers | Org / Global | unique per professional, engaged, inactive, rates |
+
+**Routes**:
+
+```
+# Organization-level
+GET /v1/organizations/{org_id}/statistics/appointments?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+GET /v1/organizations/{org_id}/statistics/revenue?start_date&end_date&group_by=week|month|year
+GET /v1/organizations/{org_id}/statistics/customers?start_date&end_date
+
+# Global (ROOT-only)
+GET /root/statistics/appointments/global?start_date&end_date
+GET /root/statistics/revenue/global?start_date&end_date&group_by
+GET /root/statistics/customers/global?start_date&end_date
+GET /root/statistics/appointments/{organization_id}
+GET /root/statistics/revenue/{organization_id}
+GET /root/statistics/customers/{organization_id}
+```
+
+**Default periods** (if not specified):
+- Appointments, Customers: last 30 days
+- Revenue: week=7 days, month=30 days, year=365 days
+
+**Rate limiting**: 5 requests/minute per user
+
+**Cache TTL**: 5 minutes (appointments), 10 minutes (revenue), 15 minutes (customers)
+
+**Example request**:
+
+```bash
+curl -X GET "http://localhost:8000/v1/organizations/1/statistics/revenue?start_date=2025-01-01&end_date=2025-01-31&group_by=week" \
+  -H "Authorization: Bearer <token>"
+```
+
+**Response structure**:
+
+```json
+{
+  "period": {
+    "start_date": "2025-01-01",
+    "end_date": "2025-01-31"
+  },
+  "metrics": {
+    "estimated_revenue": 5000.00,
+    "concrete_revenue": 3200.50,
+    "week_of_2025_01_01": 800.00,
+    "week_of_2025_01_08": 950.50,
+    ...
+  }
+}
+```
+
+---
+
+### Advanced Reporting
+
+PDF and CSV report generation with metadata, summary metrics, and optional detailed data export.
+
+**Report types**:
+- **Appointments**: total, completed, cancelled, no_show counts and rates
+- **Revenue**: estimated vs concrete, groupable by week/month/year
+- **Customers**: unique per professional, active/inactive, engagement rates
+
+**Routes**:
+
+```
+# Organization-level
+GET /v1/organizations/{org_id}/reports/appointments?format=pdf|csv&start_date&end_date&professional_id&customer_id
+GET /v1/organizations/{org_id}/reports/revenue?format=pdf|csv&start_date&end_date&professional_id&group_by
+GET /v1/organizations/{org_id}/reports/customers?format=pdf|csv&start_date&end_date&professional_id
+
+# Global (ROOT-only)
+GET /root/reports/appointments/global?format=pdf|csv&start_date&end_date&professional_id&customer_id
+GET /root/reports/revenue/global?format=pdf|csv&start_date&end_date&professional_id&group_by
+GET /root/reports/customers/global?format=pdf|csv&start_date&end_date&professional_id
+```
+
+**Report structure**:
+
+1. **Metadata** (PDF + CSV header): title, generation timestamp, organization ID, period, applied filters
+2. **Summary** (PDF + CSV): key metrics in human-readable format
+3. **Detailed data** (CSV only): full dataset for further analysis
+
+**Rate limiting**: 2 requests/minute (reports are compute-heavy)
+
+**Cache TTL**: 5 minutes (data changes frequently)
+
+**Example request**:
+
+```bash
+# PDF export
+curl -X GET "http://localhost:8000/v1/organizations/1/reports/appointments?format=pdf&start_date=2025-01-01&end_date=2025-01-31" \
+  -H "Authorization: Bearer <token>" \
+  -o appointments_report.pdf
+
+# CSV export with filters
+curl -X GET "http://localhost:8000/root/reports/revenue/global?format=csv&start_date=2025-01-01&end_date=2025-01-31&professional_id=5&group_by=week" \
+  -H "Authorization: Bearer <token>" \
+  -o revenue_report.csv
+```
+
+**PDF content**:
+- Metadata section with title, date, organization, period, and filters
+- Summary metrics (readable format)
+- No charts or data tables (avoid duplication with CSV)
+
+**CSV content**:
+- Metadata header (title, date, organization, period, filters)
+- Summary section (metrics)
+- Detailed data table (raw query results for analysis)
+
+---
+
+## Synchronous Pandas in an Async Environment
+
+Booking Engine executes synchronous pandas operations within a FastAPI/asyncio environment using `asyncio.to_thread()`, which offloads CPU-bound work to a thread pool without blocking the event loop.
+
+### Why synchronous pandas is necessary
+
+pandas does not have native async support. `pd.read_sql()` is synchronous and would block the event loop if executed directly inside a coroutine, causing timeouts for other requests.
+
+### Implementation
+
+In `statistics_service.py`:
+
+```python
+import asyncio
+from sqlalchemy import create_engine, text
+
+# Dedicated synchronous engine for pandas
+engine_sync = create_engine(
+    DATABASE_URL.replace("+aiomysql", "+pymysql"),
+    pool_size=5,
+    max_overflow=10
+)
+
+async def _read_sql_sync(query: str, params: dict = None) -> pd.DataFrame:
+    """Executes a synchronous SQL query in a thread pool and returns a DataFrame."""
+    def sync_read():
+        with engine_sync.begin() as conn:
+            result = conn.execute(text(query), params or {})
+            return pd.DataFrame(result.mappings())
+    
+    # to_thread() moves the function to a thread pool and returns an awaitable
+    return await asyncio.to_thread(sync_read)
+
+async def get_appointments_statistics(org_id: int | None, start_date, end_date) -> dict:
+    """Service that utilizes synchronous pandas."""
+    query = """
+        SELECT status, COUNT(*) as count
+        FROM appointments
+        WHERE start_at BETWEEN :start AND :end
+        {'AND organization_id = :org_id' if org_id else ''}
+        GROUP BY status
+    """
+    
+    # Executes pandas in a separate thread
+    df = await _read_sql_sync(query, {
+        'start': start_date,
+        'end': end_date,
+        'org_id': org_id
+    })
+    
+    # Processes the DataFrame (also within thread pool)
+    return {
+        'total': len(df),
+        'completed': int(df[df['status'] == 'COMPLETED']['count'].sum()),
+        'cancelled': int(df[df['status'] == 'CANCELLED']['count'].sum()),
+    }
+```
+
+### How it works
+
+1. **Request arrives** → FastAPI route is async
+2. **`await asyncio.to_thread(sync_read)` call** → task sends `sync_read()` to the thread pool
+3. **Event loop remains free** → handles other incoming requests while the thread executes pandas
+4. **Thread finishes** → returns the DataFrame, `await` unblocks and resumes processing
+5. **Response sent** → data reaches the client
+
+### Advantages
+
+- Pandas uses NumPy (C bindings) — very fast in threads
+- Event loop never blocks; 100 concurrent requests work smoothly
+- No changes required to pandas code (uses standard `pd.read_sql()`)
+
+### Limitations
+
+- Small thread pool (`pool_size=5`) — too many heavy queries may stall processing
+- In-memory Pandas — large DataFrames (>1GB) can cause Out Of Memory (OOM) errors
+- No caching → every statistics request re-executes the entire query
 
 ---
 

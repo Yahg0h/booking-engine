@@ -10,6 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import (
     OrganizationCreate,
     OrganizationSettingsUpdate,
@@ -44,7 +45,7 @@ from app.api.v1.services.statistics_service import (
     get_customers_statistics,
     get_revenue_statistics,
 )
-from app.rate_limiter import limiter
+from app.config import API_VERSION
 
 # Configure router
 router = APIRouter(prefix="/v1")
@@ -96,7 +97,7 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
         entity_id=recent_org,
         old_values=None,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -200,7 +201,7 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
             entity_id=id,
             old_values=is_real,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -311,7 +312,7 @@ async def update_org_settings(request: Request, id: int, settings: OrganizationS
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -331,6 +332,7 @@ async def update_org_settings(request: Request, id: int, settings: OrganizationS
 # ==========================================
 @router.get("/organizations/{id}/statistics/appointments", status_code=200)
 @limiter.limit("5/minute")
+@cached(ttl=300)
 async def appointment_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, user_id: int = Depends(verify_user_token)):
     """
     Retrieves and caches appointment statistics for a specific organization.
@@ -360,25 +362,15 @@ async def appointment_statistics(request: Request, id: int, start_date: datetime
     # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
     if not await check_organization_access(user_id, is_real["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     # Get appointments statistics for the organization
     appts_stats = await get_appointments_statistics(id, start_date, end_date)
-
-    # Manual caching (converts datas to string)
-    cache_key = f"cache:appointment_statistics:{id}:{start_date}:{end_date}"
-    result_to_cache = {
-        **appts_stats,
-        "period": {
-            "start_date": appts_stats["period"]["start_date"].isoformat(),
-            "end_date": appts_stats["period"]["end_date"].isoformat()
-        }
-    }
-    set_cached(cache_key, result_to_cache, ttl=900)
 
     return appts_stats
 
 @router.get("/organizations/{id}/statistics/revenue", status_code=200)
 @limiter.limit("5/minute")
+@cached(ttl=600)
 async def revenue_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, group_by: str = 'week', user_id: int = Depends(verify_user_token)):
     """
     Retrieves and caches revenue statistics for a specific organization.
@@ -413,21 +405,11 @@ async def revenue_statistics(request: Request, id: int, start_date: datetime | N
     # Get the organization's revenue statistics
     rev_stats = await get_revenue_statistics(id, start_date, end_date, group_by)
 
-    # Manual caching (converts datas to string)
-    cache_key = f"cache:revenue_statistics:{id}:{start_date}:{end_date}"
-    result_to_cache = {
-        **rev_stats,
-        "period": {
-            "start_date": rev_stats["period"]["start_date"].isoformat(),
-            "end_date": rev_stats["period"]["end_date"].isoformat()
-        }
-    }
-    set_cached(cache_key, result_to_cache, ttl=600)
-
     return rev_stats
 
 @router.get("/organizations/{id}/statistics/customers", status_code=200)
 @limiter.limit("5/minute")
+@cached(ttl=900)
 async def customer_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, user_id: int = Depends(verify_user_token)):
     """
     Retrieves and caches customer statistics for a specific organization.
@@ -461,17 +443,6 @@ async def customer_statistics(request: Request, id: int, start_date: datetime | 
     # Get the organization's customer statistics
     customers_stats = await get_customers_statistics(id, start_date, end_date)
 
-    # Manual caching (converts datas to string)
-    cache_key = f"cache:customer_statistics:{id}:{start_date}:{end_date}"
-    result_to_cache = {
-        **customers_stats,
-        "period": {
-            "start_date": customers_stats["period"]["start_date"].isoformat(),
-            "end_date": customers_stats["period"]["end_date"].isoformat()
-        }
-    }
-    set_cached(cache_key, result_to_cache, ttl=900)
-
     return customers_stats
 
 # ==========================================
@@ -498,7 +469,7 @@ async def organization_appointments_report(
     # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
     if not await check_organization_access(user_id, is_real["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     report_data = await generate_appointments_report(
         org_id=id,
         start_date=start_date,
@@ -510,7 +481,7 @@ async def organization_appointments_report(
     # Manual caching
     cache_key = f"cache:org_report_appointments:{start_date}:{end_date}:{professional_id}:{customer_id}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(
@@ -548,7 +519,7 @@ async def organization_revenue_report(
     # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
     if not await check_organization_access(user_id, is_real["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     report_data = await generate_revenue_report(
         org_id=id,
         start_date=start_date,
@@ -560,7 +531,7 @@ async def organization_revenue_report(
     # Manual caching
     cache_key = f"cache:org_report_revenue:{start_date}:{end_date}:{professional_id}:{group_by}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(
@@ -597,7 +568,7 @@ async def organization_customers_report(
     # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
     if not await check_organization_access(user_id, is_real["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     report_data = await generate_customers_report(
         org_id=id,
         start_date=start_date,
@@ -608,7 +579,7 @@ async def organization_customers_report(
     # Manual caching
     cache_key = f"cache:org_report_customers:{start_date}:{end_date}:{professional_id}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(

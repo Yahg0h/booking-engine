@@ -43,7 +43,7 @@ def json_serializer(obj: Any) -> Any:
     # Handle Pandas Series by converting them to a list.
     if isinstance(obj, pd.Series):
         return obj.tolist()
-    
+
     raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
 
 # ==== LOCK FUNCTIONS ====
@@ -90,7 +90,7 @@ def cached(ttl: int | None = None):
                 for k, v in kwargs.items()
                 if not isinstance(v, Request)
             }
-            
+
             # Sets up a clean and predictable key.
             cache_key = f"cache:{func.__name__}:{cache_kwargs}"
 
@@ -112,10 +112,10 @@ def cached(ttl: int | None = None):
 def get_cached(key: str) -> dict | None:
     """
     Retrieves a cached value from Redis.
-    
+
     Args:
         key: The cache key
-    
+
     Returns:
         dict | None: Deserialized JSON or None if not found
     """
@@ -140,7 +140,7 @@ def get_cached(key: str) -> dict | None:
 def set_cached(key: str, value: Any, ttl: int | None) -> None:
     """
     Stores a value in Redis cache.
-    
+
     Args:
         key: The cache key
         value: Data to cache (will be JSON serialized)
@@ -178,10 +178,10 @@ def delete_cached(key: str) -> None:
 def invalidate_pattern(pattern: str) -> int:
     """
     Invalidates all cache keys matching a pattern.
-    
+
     Args:
         pattern: Redis key pattern (e.g., "cache:procedures:*")
-    
+
     Returns:
         int: Number of keys deleted
     """

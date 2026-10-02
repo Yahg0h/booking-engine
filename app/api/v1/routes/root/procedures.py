@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import ProcedureCreate, ProcedureUpdate
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import (
@@ -21,7 +22,7 @@ from app.api.v1.services.procedure_service import (
     search_procedure_by_id,
     update_procedure,
 )
-from app.rate_limiter import limiter
+from app.config import API_VERSION
 
 # Configure router
 router = APIRouter(prefix="/v1/root")
@@ -77,7 +78,7 @@ async def create_procedure_route(request: Request, procedure: ProcedureCreate, u
             entity_id=recent_procedure_id,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -219,7 +220,7 @@ async def update_procedure_route(request: Request, id: int, procedure: Procedure
         entity_id=id,
         old_values=old_values,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -290,7 +291,7 @@ async def delete_procedure(request: Request, id: int, user_id: int = Depends(ver
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====

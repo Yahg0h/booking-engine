@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import UserCreate, UserUpdateAdmin, UserUpdateOwn
 from app.api.v1.services.audit_service import (
     get_ip_from_request,
@@ -28,88 +29,10 @@ from app.api.v1.services.user_service import (
     update_own_profile,
     update_user_admin,
 )
-from app.rate_limiter import limiter
+from app.config import API_VERSION
 
 # Configure router
 router = APIRouter(prefix="/v1")
-
-# CREATE a user staff account
-@router.post("/users", status_code=201)
-@limiter.limit("10/minute")
-async def create_staff(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
-    """
-    Creates a new staff user account.
-
-    Args:
-        request: The FastAPI request object
-        user: The user creation schema
-        user_id: The ID of the authenticated user
-
-    Returns:
-        dict: A success message confirming the staff account was created
-
-    Raises:
-        HTTPException: If the current user does not have access to create the staff account, if the email is already registered, or if access is denied
-    """
-    # Check access (owner or root only)
-    if not await check_user_access(user_id, user.organization_id):
-        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
-
-    # Check if the to-be added staff email is already registered; if it is, return 409
-    if await search_user_by_email(user.email):
-        raise HTTPException(status_code=409, detail="Staff email is already registered.")
-
-    # If the current user has access, make sure the account to be created is a staff account
-    user.role = "STAFF"
-
-    # Add staff user account
-    new_staff_id = await create_user(
-        user.organization_id,
-        user.name,
-        user.email,
-        user.password,
-        user.role,
-        user.is_active
-    )
-
-    # ==== AUDIT LOGS ENTRY ====
-    # Add new values to a dict and log action
-    new_values = {
-        "organization_id": user.organization_id,
-        "name": user.name,
-        "email": user.email,
-        "role": user.role,
-        "is_active": user.is_active
-    }
-
-    # Get IP Address
-    ip_address = get_ip_from_request(request)
-
-    # Log action
-    await log_action(
-        organization_id=user.organization_id,
-        actor_user_id=user_id,
-        action='CREATE',
-        entity_type='USER',
-        entity_id=new_staff_id,
-        old_values=None,
-        new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
-        ip_address=ip_address
-    )
-    # ==== END OF AUDIT LOGS ENTRY ====
-
-    # ==== STRUCTURED LOGGING ====
-    logger.info(
-        f"User staff account created: id={new_staff_id}, "
-        f"org_id={user.organization_id}"
-    )
-
-    # Return success message
-    success_dict = {
-        "message": f"Staff user account created successfully. UserID = {new_staff_id}, OrgID = {user.organization_id}."
-    }
-    return success_dict
 
 # CREATE a user owner account (root-account only)
 @router.post("/users/owners", status_code=201)
@@ -172,7 +95,7 @@ async def create_owner(request: Request, user: UserCreate, user_id: int | None =
         entity_id=new_owner_id,
         old_values=None,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -186,6 +109,84 @@ async def create_owner(request: Request, user: UserCreate, user_id: int | None =
     # Return success message
     success_dict = {
         "message": f"Owner user account created successfully. UserID = {new_owner_id}, OrgID = {user.organization_id}."
+    }
+    return success_dict
+
+# CREATE a user staff account
+@router.post("/users", status_code=201)
+@limiter.limit("10/minute")
+async def create_staff(request: Request, user: UserCreate, user_id: int | None = Depends(verify_user_token)):
+    """
+    Creates a new staff user account.
+
+    Args:
+        request: The FastAPI request object
+        user: The user creation schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: A success message confirming the staff account was created
+
+    Raises:
+        HTTPException: If the current user does not have access to create the staff account, if the email is already registered, or if access is denied
+    """
+    # Check access (owner or root only)
+    if not await check_user_access(user_id, user.organization_id):
+        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+
+    # Check if the to-be added staff email is already registered; if it is, return 409
+    if await search_user_by_email(user.email):
+        raise HTTPException(status_code=409, detail="Staff email is already registered.")
+
+    # If the current user has access, make sure the account to be created is a staff account
+    user.role = "STAFF"
+
+    # Add staff user account
+    new_staff_id = await create_user(
+        user.organization_id,
+        user.name,
+        user.email,
+        user.password,
+        user.role,
+        user.is_active
+    )
+
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    new_values = {
+        "organization_id": user.organization_id,
+        "name": user.name,
+        "email": user.email,
+        "role": user.role,
+        "is_active": user.is_active
+    }
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Log action
+    await log_action(
+        organization_id=user.organization_id,
+        actor_user_id=user_id,
+        action='CREATE',
+        entity_type='USER',
+        entity_id=new_staff_id,
+        old_values=None,
+        new_values=new_values,
+        metadata={"source": "api", "version": API_VERSION},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"User staff account created: id={new_staff_id}, "
+        f"org_id={user.organization_id}"
+    )
+
+    # Return success message
+    success_dict = {
+        "message": f"Staff user account created successfully. UserID = {new_staff_id}, OrgID = {user.organization_id}."
     }
     return success_dict
 
@@ -250,81 +251,6 @@ async def get_user(request: Request, id: int, user_id: int | None = Depends(veri
         return user_info
     else:
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-
-# UPDATE a user's information (User-only)
-@router.patch("/users/{id}", status_code=200)
-@limiter.limit("20/minute")
-async def update_user_info(request: Request, id: int, user: UserUpdateOwn, user_id: int | None = Depends(verify_user_token)):
-    """
-    Updates the profile information of the authenticated user.
-
-    Args:
-        request: The FastAPI request object
-        id: The ID of the user being updated
-        user: The user profile update schema
-        user_id: The ID of the authenticated user
-
-    Returns:
-        dict: The updated user information
-
-    Raises:
-        HTTPException: If the user is not allowed to update the account, if the current password is invalid, or if the update operation fails
-    """
-    # Check if the current user's is the user of id 'id'; if it isn't, return 403
-    if id != user_id:
-        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
-
-    # Else, update user info and return success message
-    try:
-        is_updated = await update_own_profile(id, user.name, user.email, user.password, user.current_password)
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-
-    # If the server didn't receive a user updated info dict, return 400
-    if not is_updated:
-        raise HTTPException(status_code=400, detail="An error occured while updating the user's information")
-
-    # ==== AUDIT LOGS ENTRY ====
-    # Add new values to a dict and log action
-    old_values = await search_user_by_id(user_id)
-    new_values = {}
-    if user.name is not None: new_values["name"] = user.name
-    if user.email is not None: new_values["email"] = user.email
-
-    # Get IP Address
-    ip_address = get_ip_from_request(request)
-
-    # Get user organization_id
-    user_organization_id = int(old_values["organization_id"]) if old_values["organization_id"] else None
-
-    # Filter sensive information out of old_values
-    old_values = sanitize_audit_values(old_values)
-    new_values = sanitize_audit_values(new_values)
-
-    # Log action
-    await log_action(
-        organization_id=user_organization_id,
-        actor_user_id=user_id,
-        action='UPDATE',
-        entity_type='USER',
-        entity_id=user_id,
-        old_values=old_values,
-        new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
-        ip_address=ip_address
-    )
-    # ==== END OF AUDIT LOGS ENTRY ====
-
-    # ==== STRUCTURED LOGGING ====
-    logger.info(
-        f"User-updated user account: id={id}, "
-        f"org_id={user_organization_id}, "
-        f"email={sanitize_for_logging(new_values.get('email'), 'email') if 'email' in new_values else 'N/A'},"
-        f"field_changed={list(new_values.keys())}"
-    )
-
-    # Else, return the newly updated user info
-    return is_updated
 
 # UPDATE a user's information (Admin - root and owner Only)
 @router.patch("/users/admin/update/{id}", status_code=200)
@@ -391,7 +317,7 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
         entity_id=id,
         old_values=old_values,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -399,6 +325,81 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
     # ==== STRUCTURED LOGGING ====
     logger.info(
         f"Admin-updated user account: id={id}, "
+        f"org_id={user_organization_id}, "
+        f"email={sanitize_for_logging(new_values.get('email'), 'email') if 'email' in new_values else 'N/A'},"
+        f"field_changed={list(new_values.keys())}"
+    )
+
+    # Else, return the newly updated user info
+    return is_updated
+
+# UPDATE a user's information (User-only)
+@router.patch("/users/{id}", status_code=200)
+@limiter.limit("20/minute")
+async def update_user_info(request: Request, id: int, user: UserUpdateOwn, user_id: int | None = Depends(verify_user_token)):
+    """
+    Updates the profile information of the authenticated user.
+
+    Args:
+        request: The FastAPI request object
+        id: The ID of the user being updated
+        user: The user profile update schema
+        user_id: The ID of the authenticated user
+
+    Returns:
+        dict: The updated user information
+
+    Raises:
+        HTTPException: If the user is not allowed to update the account, if the current password is invalid, or if the update operation fails
+    """
+    # Check if the current user's is the user of id 'id'; if it isn't, return 403
+    if id != user_id:
+        raise HTTPException(status_code=403, detail="You aren't allowed to perform this action.")
+
+    # Else, update user info and return success message
+    try:
+        is_updated = await update_own_profile(id, user.name, user.email, user.password, user.current_password)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+    # If the server didn't receive a user updated info dict, return 400
+    if not is_updated:
+        raise HTTPException(status_code=400, detail="An error occured while updating the user's information")
+
+    # ==== AUDIT LOGS ENTRY ====
+    # Add new values to a dict and log action
+    old_values = await search_user_by_id(user_id)
+    new_values = {}
+    if user.name is not None: new_values["name"] = user.name
+    if user.email is not None: new_values["email"] = user.email
+
+    # Get IP Address
+    ip_address = get_ip_from_request(request)
+
+    # Get user organization_id
+    user_organization_id = int(old_values["organization_id"]) if old_values["organization_id"] else None
+
+    # Filter sensive information out of old_values
+    old_values = sanitize_audit_values(old_values)
+    new_values = sanitize_audit_values(new_values)
+
+    # Log action
+    await log_action(
+        organization_id=user_organization_id,
+        actor_user_id=user_id,
+        action='UPDATE',
+        entity_type='USER',
+        entity_id=user_id,
+        old_values=old_values,
+        new_values=new_values,
+        metadata={"source": "api", "version": API_VERSION},
+        ip_address=ip_address
+    )
+    # ==== END OF AUDIT LOGS ENTRY ====
+
+    # ==== STRUCTURED LOGGING ====
+    logger.info(
+        f"User-updated user account: id={id}, "
         f"org_id={user_organization_id}, "
         f"email={sanitize_for_logging(new_values.get('email'), 'email') if 'email' in new_values else 'N/A'},"
         f"field_changed={list(new_values.keys())}"
@@ -466,7 +467,7 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====

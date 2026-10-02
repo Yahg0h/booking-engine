@@ -12,10 +12,10 @@ from fastapi.security import HTTPBearer
 from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.middleware.idempotency import IdempotencyMiddleware
-from app.config import settings
+from app.api.v1.middleware.rate_limiter import limiter
+from app.config import API_VERSION, settings
 from app.database import check_database_connection
 from app.logging_config import setup_logging
-from app.rate_limiter import limiter
 
 # Trigger logging configuration before app initialization
 setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)
@@ -24,7 +24,7 @@ setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)
 app = FastAPI(
     title="Booking Engine",
     description="A REST scheduling API designed around dynamic availability and concurrency.",
-    version="1.0.0",
+    version=API_VERSION,
     debug=settings.DEBUG
 )
 
@@ -79,7 +79,7 @@ def custom_openapi():
 
     openapi_schema = get_openapi(
         title="Booking Engine API",
-        version="1.0.0",
+        version=API_VERSION,
         description="Multi-tenant appointment booking REST API",
         routes=app.routes,
     )
@@ -119,7 +119,7 @@ async def health_check():
     now = datetime.now(tz=timezone.utc)
     return {
         "service_name": 'Booking Engine',
-        "service_version": '1.0.0',
+        "service_version": API_VERSION,
         "db_connected": connect_check,
         "checked_at": now,
         "db_error": error_message

@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import (
     OrganizationCreate,
     OrganizationSettingsUpdate,
@@ -25,7 +26,7 @@ from app.api.v1.services.organization_settings_service import (
     update_organization_settings,
 )
 from app.api.v1.services.permission_service import is_root
-from app.rate_limiter import limiter
+from app.config import API_VERSION
 
 # Configure router
 router = APIRouter(prefix="/v1/root")
@@ -79,7 +80,7 @@ async def create_org(request: Request, org_data: OrganizationCreate, user_id: in
             entity_id=recent_org,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -180,7 +181,7 @@ async def update_org(request: Request, id: int, org_data: OrganizationUpdate, us
             entity_id=id,
             old_values=is_real,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -290,7 +291,7 @@ async def update_org_settings(request: Request, id: int, settings: OrganizationS
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====

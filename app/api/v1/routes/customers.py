@@ -11,6 +11,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import CustomerCreate, CustomerUpdate
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
@@ -23,7 +24,7 @@ from app.api.v1.services.customer_service import (
     search_customer_by_id,
     update_customers,
 )
-from app.rate_limiter import limiter
+from app.config import API_VERSION
 
 # Configure router
 router = APIRouter(prefix="/v1")
@@ -78,7 +79,7 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
             entity_id=recent_customer,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -223,7 +224,7 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -293,7 +294,7 @@ async def delete_customer(request: Request, id: int, user_id: int = Depends(veri
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====

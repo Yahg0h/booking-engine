@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import UserCreate, UserUpdateAdmin
 from app.api.v1.services.audit_service import (
     get_ip_from_request,
@@ -25,7 +26,7 @@ from app.api.v1.services.user_service import (
     search_user_by_id,
     update_user_admin,
 )
-from app.rate_limiter import limiter
+from app.config import API_VERSION
 
 # Configure router
 router = APIRouter(prefix="/v1/root")
@@ -92,7 +93,7 @@ async def create_account(request: Request, user: UserCreate, user_id: int | None
         entity_id=new_account_id,
         old_values=None,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -228,7 +229,7 @@ async def elevated_user_update(request: Request, id: int, user: UserUpdateAdmin,
         entity_id=user_id,
         old_values=old_values,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -303,7 +304,7 @@ async def delete_user(request: Request, id: int, user_id: int | None = Depends(v
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====

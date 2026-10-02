@@ -2,12 +2,12 @@
 Global test fixtures for BookingEngine test suite.
 
 Unit tests: mock the engine directly.
-Integration tests: function-scoped client (um por teste).
-Engine leak resolvido com pool_size=1 + NullPool no app durante testes.
+Integration tests: function-scoped client (one per test).
+Engine leak resolved using pool_size=1 + NullPool in the app during testing.
 """
 
-import uuid
 import re
+import uuid
 
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -67,9 +67,9 @@ def auth_headers(user_id: int) -> dict:
 
 # ==========================================
 # CLIENT FIXTURE
-# Usa NullPool no engine do app durante testes:
-# cada conexão é aberta e fechada imediatamente,
-# sem pool para vazar entre testes.
+# Use NullPool for the app engine during tests:
+# each connection is opened and closed immediately,
+# with no pool to leak between tests.
 # ==========================================
 
 @pytest_asyncio.fixture
@@ -79,12 +79,12 @@ async def client():
     import app.database as db_module
     from app.database import DATABASE_URL
 
-    # Substitui o engine do app por um com NullPool
+    # Replaces the app engine with one using NullPool
     test_engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
     original_engine = db_module.engine
     db_module.engine = test_engine
 
-    # Também precisa substituir nos services que importam engine diretamente
+    # It was also replaced in services that import the engine directly.
     import app.api.v1.services.appointment_service as appointment_svc
     import app.api.v1.services.audit_service as audit_svc
     import app.api.v1.services.customer_service as customer_svc
@@ -108,7 +108,7 @@ async def client():
     ) as ac:
         yield ac
 
-    # Restaura engine original e fecha o de teste
+    # Restores the original engine and closes the test one
     db_module.engine = original_engine
     for module in svc_modules:
         if hasattr(module, 'engine'):
@@ -123,11 +123,12 @@ async def client():
 
 async def api_register_root(client) -> dict:
     """
-    Garante um ROOT de teste com credenciais conhecidas.
+    Ensures a test ROOT account with known credentials exists.
 
-    Reutiliza a conta quando as credenciais fixas funcionam. Se a conta está
-    ausente, mas existe outro ROOT, ou se a senha da conta fixa mudou, remove
-    a conta ROOT existente e recria a conta de teste.
+    Reuses the account if the fixed credentials work. If the account is
+    missing but another ROOT account exists, or if the fixed account's
+    password has changed, it removes the existing ROOT account and
+    recreates the test account.
     """
     import jwt
     from sqlalchemy import text
@@ -264,9 +265,9 @@ async def setup_org_with_owner(client, root_headers: dict) -> dict:
 @pytest_asyncio.fixture(autouse=True)
 async def cleanup_pool_after_test():
     """
-    Força cleanup de conexões após cada teste.
-    Resolve conflitos de dupla-conexão em operações UPDATE
-    que abrem uma tx e depois chamam search_* que abre outra.
+    Forces connection cleanup after each test.
+    Resolves double-connection conflicts in UPDATE operations
+    that open a transaction and then call search_*, which opens another.
     """
     yield
     import app.database as db_module
