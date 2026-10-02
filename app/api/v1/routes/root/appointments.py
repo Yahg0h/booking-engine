@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import AppointmentCreate, AppointmentUpdate
 from app.api.v1.services.appointment_service import (
     appointment_canceled,
@@ -27,7 +28,6 @@ from app.api.v1.services.professional_service import (
     search_professional_by_id,
 )
 from app.config import API_VERSION
-from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1/root")

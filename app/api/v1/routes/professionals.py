@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import (
     BlackoutCreate,
     ProfessionalCreate,
@@ -53,7 +54,6 @@ from app.api.v1.services.professional_service import (
 )
 from app.api.v1.services.user_service import search_user_by_id
 from app.config import API_VERSION
-from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1")

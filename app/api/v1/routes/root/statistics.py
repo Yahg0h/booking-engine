@@ -5,6 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.cache_service import set_cached
 from app.api.v1.services.organization_service import search_organization_by_id
@@ -17,7 +18,6 @@ from app.api.v1.services.statistics_service import (
     get_revenue_statistics_global,
 )
 from app.api.v1.services.user_service import is_root
-from app.rate_limiter import limiter
 
 router = APIRouter(prefix="/v1/root")
 

@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import ProcedureCreate, ProcedureUpdate
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import (
@@ -22,7 +23,6 @@ from app.api.v1.services.procedure_service import (
     update_procedure,
 )
 from app.config import API_VERSION
-from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1/root")

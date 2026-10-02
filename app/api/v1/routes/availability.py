@@ -5,12 +5,12 @@ from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.services.availability_service import availability_service
 from app.api.v1.services.cache_service import cached
 from app.api.v1.services.organization_service import search_organization_by_id
 from app.api.v1.services.procedure_service import search_procedure_by_id
 from app.api.v1.services.professional_service import search_professional_by_id
-from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1")

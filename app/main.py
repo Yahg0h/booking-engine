@@ -12,10 +12,10 @@ from fastapi.security import HTTPBearer
 from slowapi.errors import RateLimitExceeded
 
 from app.api.v1.middleware.idempotency import IdempotencyMiddleware
+from app.api.v1.middleware.rate_limiter import limiter
 from app.config import API_VERSION, settings
 from app.database import check_database_connection
 from app.logging_config import setup_logging
-from app.rate_limiter import limiter
 
 # Trigger logging configuration before app initialization
 setup_logging(settings.LOG_FORMAT, settings.LOG_LEVEL)

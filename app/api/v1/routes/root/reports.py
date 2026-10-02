@@ -7,6 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.services.auth_service import verify_user_token
 from app.api.v1.services.cache_service import set_cached
 from app.api.v1.services.report_generator import (
@@ -19,7 +20,6 @@ from app.api.v1.services.report_service import (
     generate_revenue_report,
 )
 from app.api.v1.services.user_service import is_root
-from app.rate_limiter import limiter
 
 router = APIRouter(prefix="/v1/root")
 

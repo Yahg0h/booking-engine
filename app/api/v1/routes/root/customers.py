@@ -10,6 +10,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import CustomerCreate, CustomerUpdate
 from app.api.v1.services.audit_service import get_ip_from_request, log_action
 from app.api.v1.services.auth_service import verify_user_token
@@ -22,7 +23,6 @@ from app.api.v1.services.customer_service import (
 )
 from app.api.v1.services.permission_service import is_root
 from app.config import API_VERSION
-from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1/root")

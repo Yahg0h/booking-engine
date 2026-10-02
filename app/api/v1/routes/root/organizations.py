@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
+from app.api.v1.middleware.rate_limiter import limiter
 from app.api.v1.schemas.schemas import (
     OrganizationCreate,
     OrganizationSettingsUpdate,
@@ -26,7 +27,6 @@ from app.api.v1.services.organization_settings_service import (
 )
 from app.api.v1.services.permission_service import is_root
 from app.config import API_VERSION
-from app.rate_limiter import limiter
 
 # Configure router
 router = APIRouter(prefix="/v1/root")
