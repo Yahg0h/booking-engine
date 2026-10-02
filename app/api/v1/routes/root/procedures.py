@@ -21,6 +21,7 @@ from app.api.v1.services.procedure_service import (
     search_procedure_by_id,
     update_procedure,
 )
+from app.config import API_VERSION
 from app.rate_limiter import limiter
 
 # Configure router
@@ -77,7 +78,7 @@ async def create_procedure_route(request: Request, procedure: ProcedureCreate, u
             entity_id=recent_procedure_id,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -219,7 +220,7 @@ async def update_procedure_route(request: Request, id: int, procedure: Procedure
         entity_id=id,
         old_values=old_values,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -290,7 +291,7 @@ async def delete_procedure(request: Request, id: int, user_id: int = Depends(ver
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====

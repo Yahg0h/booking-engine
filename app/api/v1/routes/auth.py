@@ -21,6 +21,7 @@ from app.api.v1.services.user_service import (
     list_users_by_role,
     search_user_by_email,
 )
+from app.config import API_VERSION
 from app.rate_limiter import limiter
 
 # Configure router
@@ -100,7 +101,7 @@ async def register(request: Request, user: UserCreate, user_id: int | None = Dep
         entity_id=new_user_id,
         old_values=None,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -165,7 +166,7 @@ async def login(request: Request, user: UserLogin):
         entity_id=None,
         old_values=None,
         new_values=None,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====

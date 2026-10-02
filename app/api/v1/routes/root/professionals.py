@@ -44,6 +44,7 @@ from app.api.v1.services.professional_service import (
     update_professional,
     update_working_hours,
 )
+from app.config import API_VERSION
 from app.rate_limiter import limiter
 
 # Configure router
@@ -100,7 +101,7 @@ async def create_professional_route(request: Request, professional: Professional
         entity_id=created,
         old_values=None,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -263,7 +264,7 @@ async def update_professional_route(request: Request, id: int, professional: Pro
         entity_id=id,
         old_values=old_values,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -333,7 +334,7 @@ async def delete_professional(request: Request, id: int, user_id: int = Depends(
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -446,7 +447,7 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
             entity_id=created_wk,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -592,7 +593,7 @@ async def update_working_hour(request: Request, professional_id: int, id: int, w
         entity_id=id,
         old_values=old_values,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -680,7 +681,7 @@ async def create_blackout(request: Request, id: int, blackout: BlackoutCreate, u
             entity_id=recent_blackout_id,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -823,7 +824,7 @@ async def create_pp_relation(request: Request, id: int, pp: ProfessionalProcedur
             entity_id=None,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -937,7 +938,7 @@ async def delete_professional_procedure(request: Request, id: int, procedure_id:
             entity_id=None,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====

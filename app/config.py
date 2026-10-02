@@ -1,5 +1,5 @@
 """
-Enviroment configuration for Booking Engine + templates path definition.
+Enviroment configuration for Booking Engine.
 """
 
 from typing import Literal
@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
+
+# API Version
+API_VERSION = "1.1.0"
 
 # Settings class
 class Settings(BaseSettings):

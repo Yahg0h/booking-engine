@@ -28,6 +28,7 @@ from app.api.v1.services.procedure_service import search_procedure_by_id
 from app.api.v1.services.professional_service import (
     search_professional_by_id,
 )
+from app.config import API_VERSION
 from app.rate_limiter import limiter
 
 # Configure router
@@ -126,7 +127,7 @@ async def create_appointment_route(request: Request, appointment: AppointmentCre
             entity_id=created_appointment_id,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -291,7 +292,7 @@ async def update_appointment(request: Request, id: int, appointment: Appointment
         entity_id=id,
         old_values=old_values,
         new_values=new_values,
-        metadata={"source": "api", "version": "1.0"},
+        metadata={"source": "api", "version": API_VERSION},
         ip_address=ip_address
     )
     # ==== END OF AUDIT LOGS ENTRY ====
@@ -390,7 +391,7 @@ async def cancel_appointment(request: Request, id: int, user_id: int = Depends(v
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====

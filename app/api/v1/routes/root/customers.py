@@ -21,6 +21,7 @@ from app.api.v1.services.customer_service import (
     update_customers,
 )
 from app.api.v1.services.permission_service import is_root
+from app.config import API_VERSION
 from app.rate_limiter import limiter
 
 # Configure router
@@ -76,7 +77,7 @@ async def create_customers(request: Request, customer: CustomerCreate, user_id: 
             entity_id=recent_customer,
             old_values=None,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -219,7 +220,7 @@ async def update_customer(request: Request, id: int, customer_update: CustomerUp
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
@@ -289,7 +290,7 @@ async def delete_customer(request: Request, id: int, user_id: int = Depends(veri
             entity_id=id,
             old_values=old_values,
             new_values=new_values,
-            metadata={"source": "api", "version": "1.0"},
+            metadata={"source": "api", "version": API_VERSION},
             ip_address=ip_address
         )
         # ==== END OF AUDIT LOGS ENTRY ====
