@@ -46,7 +46,7 @@ async def all_appointment_statistics(request: Request, start_date: datetime | No
     # Check if the current user is root; If not, return 403
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     # Get global appointments statistics (all organizations)
     all_appts_stats = await get_appointments_statistics_global(start_date, end_date)
 

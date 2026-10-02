@@ -387,7 +387,7 @@ async def create_working_hour(request: Request, id: int, workinghours: WorkingHo
     # Verify if the new working hour information isn't on a weekday that already has a working hour registered
     if await check_existing_weekday(workinghours.weekday, id):
         raise HTTPException(status_code=409, detail="A working hour record already exists for the selected day of the week.")
-    
+
     # Verify if the professional can work on this day (organization must operate on this day)
     settings = await get_organization_settings(professional["organization_id"])
 

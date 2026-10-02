@@ -362,7 +362,7 @@ async def appointment_statistics(request: Request, id: int, start_date: datetime
     # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
     if not await check_organization_access(user_id, is_real["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     # Get appointments statistics for the organization
     appts_stats = await get_appointments_statistics(id, start_date, end_date)
 
@@ -469,7 +469,7 @@ async def organization_appointments_report(
     # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
     if not await check_organization_access(user_id, is_real["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     report_data = await generate_appointments_report(
         org_id=id,
         start_date=start_date,
@@ -481,7 +481,7 @@ async def organization_appointments_report(
     # Manual caching
     cache_key = f"cache:org_report_appointments:{start_date}:{end_date}:{professional_id}:{customer_id}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(
@@ -519,7 +519,7 @@ async def organization_revenue_report(
     # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
     if not await check_organization_access(user_id, is_real["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     report_data = await generate_revenue_report(
         org_id=id,
         start_date=start_date,
@@ -531,7 +531,7 @@ async def organization_revenue_report(
     # Manual caching
     cache_key = f"cache:org_report_revenue:{start_date}:{end_date}:{professional_id}:{group_by}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(
@@ -568,7 +568,7 @@ async def organization_customers_report(
     # If it does, check if the current user is a root or the Owner of the organization; If not, return 403
     if not await check_organization_access(user_id, is_real["id"]):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     report_data = await generate_customers_report(
         org_id=id,
         start_date=start_date,
@@ -579,7 +579,7 @@ async def organization_customers_report(
     # Manual caching
     cache_key = f"cache:org_report_customers:{start_date}:{end_date}:{professional_id}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(

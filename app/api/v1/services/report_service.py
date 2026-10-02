@@ -32,14 +32,14 @@ async def generate_appointments_report(
 ) -> dict:
     """
     Generates appointment report data with metadata and summary.
-    
+
     Args:
         org_id: Organization ID (None for global)
         start_date: Report period start (default: 30 days ago)
         end_date: Report period end (default: now)
         professional_id: Filter by professional (optional)
         customer_id: Filter by customer (optional)
-    
+
     Returns:
         dict with metadata, summary, and DataFrame
     """
@@ -47,30 +47,30 @@ async def generate_appointments_report(
         end_date = datetime.now(timezone.utc)
     if start_date is None:
         start_date = end_date - timedelta(days=30)
-    
+
     # Build filters dynamically
     filters = []
     params = {
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat()
     }
-    
+
     if org_id is not None:
         filters.append("AND a.organization_id = :org_id")
         params["org_id"] = org_id
-    
+
     if professional_id is not None:
         filters.append("AND a.professional_id = :professional_id")
         params["professional_id"] = professional_id
-    
+
     if customer_id is not None:
         filters.append("AND a.customer_id = :customer_id")
         params["customer_id"] = customer_id
-    
+
     filters_str = " ".join(filters)
-    
+
     query = f"""
-        SELECT 
+        SELECT
             a.id AS appointment_id,
             a.start_at AS appointment_start,
             a.status AS appointment_status,
@@ -86,9 +86,9 @@ async def generate_appointments_report(
             {filters_str}
         ORDER BY a.start_at DESC
     """
-    
+
     df = await asyncio.to_thread(_read_sql_sync, query, params)
-    
+
     # Calculate summary
     if df.empty:
         summary = {
@@ -106,7 +106,7 @@ async def generate_appointments_report(
             "no_show": len(df[df['appointment_status'] == 'NO_SHOW']),
             "total_revenue": float(df['procedure_price'].sum())
         }
-    
+
     return {
         "metadata": {
             "report_title": "Appointments Report",
@@ -136,14 +136,14 @@ async def generate_revenue_report(
 ) -> dict:
     """
     Generates revenue report data with metadata and summary.
-    
+
     Args:
         org_id: Organization ID (None for global)
         start_date: Report period start (default: 30 days ago)
         end_date: Report period end (default: now)
         professional_id: Filter by professional (optional)
         group_by: Grouping interval ('week', 'month', 'year')
-    
+
     Returns:
         dict with metadata, summary, and DataFrame
     """
@@ -159,25 +159,25 @@ async def generate_revenue_report(
             start_date = end_date - timedelta(days=365)
         else:
             start_date = end_date - timedelta(days=30)
-    
+
     filters = []
     params = {
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat()
     }
-    
+
     if org_id is not None:
         filters.append("AND a.organization_id = :org_id")
         params["org_id"] = org_id
-    
+
     if professional_id is not None:
         filters.append("AND a.professional_id = :professional_id")
         params["professional_id"] = professional_id
-    
+
     filters_str = " ".join(filters)
-    
+
     query = f"""
-        SELECT 
+        SELECT
             a.id AS appointment_id,
             a.start_at AS appointment_start,
             a.status AS appointment_status,
@@ -192,9 +192,9 @@ async def generate_revenue_report(
             {filters_str}
         ORDER BY a.start_at DESC
     """
-    
+
     df = await asyncio.to_thread(_read_sql_sync, query, params)
-    
+
     # Calculate summary
     if df.empty:
         summary = {
@@ -208,7 +208,7 @@ async def generate_revenue_report(
             "total_concrete_revenue": float(df[df['revenue_type'] == 'Concrete']['procedure_price'].sum()),
             "appointment_count": len(df)
         }
-    
+
     return {
         "metadata": {
             "report_title": "Revenue Report",
@@ -237,13 +237,13 @@ async def generate_customers_report(
 ) -> dict:
     """
     Generates customer engagement report data with metadata and summary.
-    
+
     Args:
         org_id: Organization ID (None for global)
         start_date: Report period start (default: 30 days ago)
         end_date: Report period end (default: now)
         professional_id: Filter by professional (optional)
-    
+
     Returns:
         dict with metadata, summary, and DataFrame
     """
@@ -251,25 +251,25 @@ async def generate_customers_report(
         end_date = datetime.now(timezone.utc)
     if start_date is None:
         start_date = end_date - timedelta(days=30)
-    
+
     filters = []
     params = {
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat()
     }
-    
+
     if org_id is not None:
         filters.append("AND a.organization_id = :org_id")
         params["org_id"] = org_id
-    
+
     if professional_id is not None:
         filters.append("AND a.professional_id = :professional_id")
         params["professional_id"] = professional_id
-    
+
     filters_str = " ".join(filters)
-    
+
     query = f"""
-        SELECT 
+        SELECT
             c.id AS customer_id,
             c.email AS customer_email,
             c.phone AS customer_phone,
@@ -285,9 +285,9 @@ async def generate_customers_report(
         GROUP BY c.id, c.email, c.phone, c.is_active, c.last_appointment_at
         ORDER BY total_appointments DESC
     """
-    
+
     df = await asyncio.to_thread(_read_sql_sync, query, params)
-    
+
     # Calculate summary
     if df.empty:
         summary = {
@@ -303,7 +303,7 @@ async def generate_customers_report(
             "inactive_customers": len(df[df['customer_active'] == False]),
             "avg_appointments_per_customer": round(df['total_appointments'].mean(), 2)
         }
-    
+
     return {
         "metadata": {
             "report_title": "Customers Report",

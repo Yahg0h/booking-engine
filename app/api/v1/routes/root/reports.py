@@ -38,7 +38,7 @@ async def global_appointments_report(
     # Check if the current user is root; If not, return 403
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     # If the format is None, default to pdf
     if format not in ["pdf", "csv"]:
         format = "pdf"
@@ -54,7 +54,7 @@ async def global_appointments_report(
     # Manual caching
     cache_key = f"cache:global_report_appointments:{start_date}:{end_date}:{professional_id}:{customer_id}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(
@@ -85,11 +85,11 @@ async def global_revenue_report(
     # Check if the current user is root; If not, return 403
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     # If the format is None, default to pdf
     if format not in ["pdf", "csv"]:
         format = "pdf"
-    
+
     report_data = await generate_revenue_report(
         org_id=None,
         start_date=start_date,
@@ -101,7 +101,7 @@ async def global_revenue_report(
     # Manual caching
     cache_key = f"cache:global_report_revenue:{start_date}:{end_date}:{professional_id}:{group_by}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(
@@ -131,11 +131,11 @@ async def global_customers_report(
     # Check if the current user is root; If not, return 403
     if not await is_root(user_id):
         raise HTTPException(status_code=403, detail="You aren't allowed to view this information.")
-    
+
     # If the format is None, default to pdf
     if format not in ["pdf", "csv"]:
         format = "pdf"
-    
+
     report_data = await generate_customers_report(
         org_id=None,
         start_date=start_date,
@@ -146,7 +146,7 @@ async def global_customers_report(
     # Manual caching
     cache_key = f"cache:global_report_customers:{start_date}:{end_date}:{professional_id}"
     set_cached(cache_key, report_data, ttl=300)
-    
+
     if format == "pdf":
         pdf_buffer = generate_pdf_report(report_data)
         return StreamingResponse(

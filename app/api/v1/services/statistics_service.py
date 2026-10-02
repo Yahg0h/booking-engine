@@ -31,7 +31,7 @@ def _read_sql_sync(query: str, params: dict) -> pd.DataFrame:
     with engine_sync.begin() as conn:
         result = conn.execute(text(query), params)
         return pd.DataFrame(result.mappings())
-    
+
 
 async def get_appointments_statistics(
     org_id: int | None,
@@ -57,9 +57,9 @@ async def get_appointments_statistics(
 
     # Adds the org_id condition dynamically.
     org_filter = "AND organization_id = :org_id" if org_id is not None else ""
-    
+
     query = f"""
-        SELECT 
+        SELECT
             COUNT(*) AS total,
             COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END) AS cancelled,
             COUNT(CASE WHEN status = 'NO_SHOW' THEN 1 END) AS no_show
@@ -140,11 +140,11 @@ async def get_revenue_statistics(
     # Converts datetime to strings in ISO format
     start_date_str = start_date.isoformat()
     end_date_str = end_date.isoformat()
-    
+
     org_filter = "AND a.organization_id = :org_id" if org_id is not None else ""
 
     query = f"""
-        SELECT 
+        SELECT
             a.id,
             a.start_at,
             a.status,
@@ -200,11 +200,11 @@ async def get_revenue_statistics(
 
     # Formats the grouped results into dicts with keys in 'YYYY-MM-DD'
     estimated_dict = {
-        k.strftime('%Y-%m-%d'): float(v) 
+        k.strftime('%Y-%m-%d'): float(v)
         for k, v in estimated_series.to_dict().items() if v > 0
     }
     concrete_dict = {
-        k.strftime('%Y-%m-%d'): float(v) 
+        k.strftime('%Y-%m-%d'): float(v)
         for k, v in concrete_series.to_dict().items() if v > 0
     }
 
@@ -250,7 +250,7 @@ async def get_customers_statistics(
 
     if org_id is not None:
         query_prof_customers = """
-            SELECT 
+            SELECT
                 p.id AS professional_id,
                 p.name AS professional_name,
                 COUNT(DISTINCT a.customer_id) AS unique_customers
@@ -263,7 +263,7 @@ async def get_customers_statistics(
         """
     else:
         query_prof_customers = """
-            SELECT 
+            SELECT
                 p.id AS professional_id,
                 p.name AS professional_name,
                 COUNT(DISTINCT a.customer_id) AS unique_customers
@@ -274,7 +274,7 @@ async def get_customers_statistics(
         """
 
     query_customer_counts = f"""
-        SELECT 
+        SELECT
             COUNT(CASE WHEN last_appointment_at BETWEEN :start_date AND :end_date THEN 1 END) AS engaged_count,
             COUNT(CASE WHEN last_appointment_at IS NULL OR last_appointment_at < :start_date THEN 1 END) AS inactive_count,
             COUNT(*) AS total_count

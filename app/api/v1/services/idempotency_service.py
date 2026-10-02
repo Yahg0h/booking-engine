@@ -9,7 +9,7 @@ from redis import Redis
 
 async def check_idempotent_request(
     redis_client: Redis,
-    org_id: int, 
+    org_id: int,
     idempotency_key: str
 ) -> tuple[bool, dict | None]:
     """
@@ -28,10 +28,10 @@ async def check_idempotent_request(
     """
     redis_key = f"idempotency:{org_id}:{idempotency_key}"
     cached = redis_client.get(redis_key)
-    
+
     if cached:
         return True, json.loads(cached)
-    
+
     return False, None
 
 
@@ -56,12 +56,12 @@ async def store_response(
         None: This function stores the serialized response without returning a value
     """
     redis_key = f"idempotency:{org_id}:{idempotency_key}"
-    
+
     payload = {
         "status_code": status_code,
         "body": response_body
     }
-    
+
     # Serialize to JSON and store for 5 mins
     redis_client.set(
         redis_key,

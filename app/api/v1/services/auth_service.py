@@ -59,7 +59,7 @@ def decode_token(token: str, ignore_exp: bool = False) -> int:
         # Else, return the user_id
         return int(user_id)
     except Exception as e:
-        raise ValueError(f"Token decoding failed: {str(e)}")
+        raise ValueError(f"Token decoding failed: {e!s}")
 
 async def verify_user_token(request: Request) -> int:
     """
