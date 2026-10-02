@@ -332,6 +332,7 @@ async def update_org_settings(request: Request, id: int, settings: OrganizationS
 # ==========================================
 @router.get("/organizations/{id}/statistics/appointments", status_code=200)
 @limiter.limit("5/minute")
+@cached(ttl=300)
 async def appointment_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, user_id: int = Depends(verify_user_token)):
     """
     Retrieves and caches appointment statistics for a specific organization.
@@ -365,21 +366,11 @@ async def appointment_statistics(request: Request, id: int, start_date: datetime
     # Get appointments statistics for the organization
     appts_stats = await get_appointments_statistics(id, start_date, end_date)
 
-    # Manual caching (converts datas to string)
-    cache_key = f"cache:appointment_statistics:{id}:{start_date}:{end_date}"
-    result_to_cache = {
-        **appts_stats,
-        "period": {
-            "start_date": appts_stats["period"]["start_date"].isoformat(),
-            "end_date": appts_stats["period"]["end_date"].isoformat()
-        }
-    }
-    set_cached(cache_key, result_to_cache, ttl=900)
-
     return appts_stats
 
 @router.get("/organizations/{id}/statistics/revenue", status_code=200)
 @limiter.limit("5/minute")
+@cached(ttl=600)
 async def revenue_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, group_by: str = 'week', user_id: int = Depends(verify_user_token)):
     """
     Retrieves and caches revenue statistics for a specific organization.
@@ -414,21 +405,11 @@ async def revenue_statistics(request: Request, id: int, start_date: datetime | N
     # Get the organization's revenue statistics
     rev_stats = await get_revenue_statistics(id, start_date, end_date, group_by)
 
-    # Manual caching (converts datas to string)
-    cache_key = f"cache:revenue_statistics:{id}:{start_date}:{end_date}"
-    result_to_cache = {
-        **rev_stats,
-        "period": {
-            "start_date": rev_stats["period"]["start_date"].isoformat(),
-            "end_date": rev_stats["period"]["end_date"].isoformat()
-        }
-    }
-    set_cached(cache_key, result_to_cache, ttl=600)
-
     return rev_stats
 
 @router.get("/organizations/{id}/statistics/customers", status_code=200)
 @limiter.limit("5/minute")
+@cached(ttl=900)
 async def customer_statistics(request: Request, id: int, start_date: datetime | None = None, end_date: datetime | None = None, user_id: int = Depends(verify_user_token)):
     """
     Retrieves and caches customer statistics for a specific organization.
@@ -461,17 +442,6 @@ async def customer_statistics(request: Request, id: int, start_date: datetime | 
 
     # Get the organization's customer statistics
     customers_stats = await get_customers_statistics(id, start_date, end_date)
-
-    # Manual caching (converts datas to string)
-    cache_key = f"cache:customer_statistics:{id}:{start_date}:{end_date}"
-    result_to_cache = {
-        **customers_stats,
-        "period": {
-            "start_date": customers_stats["period"]["start_date"].isoformat(),
-            "end_date": customers_stats["period"]["end_date"].isoformat()
-        }
-    }
-    set_cached(cache_key, result_to_cache, ttl=900)
 
     return customers_stats
 
